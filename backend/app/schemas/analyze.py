@@ -88,6 +88,19 @@ class AnalyzeResponse(BaseModel):
     keywords: KeywordsInfo
     entities: EntitiesInfo
 
+from app.schemas.article import ArticleResponse
+from app.schemas.analysis import AnalysisResponse
+
+class ArticleAnalyzeRequest(BaseModel):
+    """Request payload for E2E Article Analysis."""
+    url: str = Field(..., description="The URL of the article to extract and analyze.")
+    top_keywords: int = Field(default=10, ge=1, le=20)
+
+class ArticleAnalyzeResponse(BaseModel):
+    """Full end-to-end response containing both the article and its saved analysis."""
+    article: ArticleResponse
+    analysis: AnalysisResponse
+
 
 # ---------------------------------------------------------------------------
 # Unsupported language response

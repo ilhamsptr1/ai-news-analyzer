@@ -21,6 +21,14 @@ from app.schemas.article import (
     ArticleListResponse,
     ArticleResponse,
 )
+from app.schemas.analyze import (
+    ArticleAnalyzeRequest, 
+    ArticleAnalyzeResponse, 
+    UnsupportedLanguageResponse
+)
+from app.ai.multilingual_analyzer import get_multilingual_analyzer
+from app.schemas.analysis import AnalysisCreate, AnalysisKeywordCreate, AnalysisEntityCreate
+from app.services.analysis_service import create_analysis
 from app.services.article_extractor import (
     ExtractionError,
     FetchError,
@@ -237,3 +245,142 @@ def delete_article_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Article with id={article_id} not found.",
         )
+
+# ---------------------------------------------------------------------------
+# POST /api/articles/analyze
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/analyze",
+    response_model=ArticleAnalyzeResponse | UnsupportedLanguageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Full Article Analysis Pipeline",
+    description="Extracts an article and runs the full AI analysis pipeline.",
+    tags=["Articles", "AI Analysis"],
+)
+def analyze_article_pipeline_endpoint(
+    payload: ArticleAnalyzeRequest,
+    db: Session = Depends(get_db),
+):
+    # Step 1 — URL validation + SSRF protection
+    try:
+        safe_url = validate_url(payload.url)
+    except SSRFBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"URL not allowed: {exc}",
+        )
+    except URLValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid URL: {exc}",
+        )
+
+    # Step 2 — Fetch + extract
+    try:
+        result = extract_article(safe_url)
+    except TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The request to the article URL timed out. Please try again later.",
+        )
+    except FetchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not reach the article URL. The server may be unavailable.",
+        )
+    except ExtractionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Article content could not be extracted. "
+                "The page may require JavaScript, be behind a paywall, "
+                "or have a non-standard layout."
+            ),
+        )
+    except Exception as exc:
+        logger.error("Unexpected extraction error for %s: %s", safe_url, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during extraction.",
+        )
+
+    # Step 3 — Persist Article
+    try:
+        article, created = create_article_from_extraction(db, result)
+    except Exception as exc:
+        logger.error("Database error saving article %s: %s", safe_url, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save article to the database.",
+        )
+        
+    # Step 4 - ML Analysis Pipeline
+    analyzer = get_multilingual_analyzer()
+    analysis_result = analyzer.analyze(text=article.content, top_keywords=payload.top_keywords)
+    
+    # Step 5 - Check if Unsupported
+    if not analysis_result["supported"]:
+        return UnsupportedLanguageResponse(
+            language=analysis_result["language"],
+            message="Bahasa artikel tidak didukung. Saat ini AI News Analyzer mendukung Bahasa Indonesia (id) dan Bahasa Inggris (en)."
+        )
+        
+    # Step 6 - Save Analysis to DB
+    keywords_payload = [
+        AnalysisKeywordCreate(
+            keyword=k["keyword"], 
+            score=k["score"], 
+            rank=i+1, 
+            method=analysis_result["keywords"]["method"]
+        )
+        for i, k in enumerate(analysis_result["keywords"]["keywords"])
+    ]
+    
+    entities_payload = [
+        AnalysisEntityCreate(
+            text=e["text"], 
+            label=e["label"], 
+            start_position=e.get("start_position", 0), 
+            end_position=e.get("end_position", 0), 
+            score=e["score"]
+        )
+        for e in analysis_result["entities"]["entities"]
+    ]
+    
+    analysis_payload = AnalysisCreate(
+        article_id=article.id,
+        language_code=analysis_result["language"]["code"],
+        language_name=analysis_result["language"]["language_name"],
+        language_confidence=analysis_result["language"]["confidence"],
+        category=analysis_result["category"]["category"],
+        category_confidence=analysis_result["category"]["confidence"],
+        sentiment=analysis_result["sentiment"]["sentiment"],
+        sentiment_confidence=analysis_result["sentiment"]["confidence"],
+        word_count=article.word_count,
+        reading_time=article.reading_time,
+        model_versions={
+            "ner": analysis_result["entities"]["model"]
+        },
+        keywords=keywords_payload,
+        entities=entities_payload
+    )
+    
+    try:
+        saved_analysis = create_analysis(db, analysis_payload)
+    except Exception as exc:
+        logger.error("Database error saving analysis for article %s: %s", article.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save analysis to the database.",
+        )
+        
+    # Step 7 - Return Combined Payload
+    from app.schemas.article import ArticleResponse
+    from app.schemas.analysis import AnalysisResponse
+    
+    return ArticleAnalyzeResponse(
+        article=ArticleResponse.model_validate(article),
+        analysis=AnalysisResponse.model_validate(saved_analysis)
+    )
