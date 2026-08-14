@@ -88,13 +88,11 @@ class TestNERExtractorCore:
         res = extractor.extract(TEXT_NO_ENTITY, language="id")
         assert len(res["entities"]) == 0
 
-    def test_duplicates_retained(self, extractor):
+    def test_duplicates_removed_automatically(self, extractor):
         res = extractor.extract(TEXT_DUPLICATES, language="en")
-        # Apple appears twice
+        # Apple appears twice in text, but extract now deduplicates automatically
         apple_ents = [e for e in res["entities"] if e["text"] == "Apple"]
-        assert len(apple_ents) == 2
-        # Different spans
-        assert apple_ents[0]["start"] != apple_ents[1]["start"]
+        assert len(apple_ents) == 1
 
     def test_get_unique_entities(self, extractor):
         res = extractor.extract(TEXT_DUPLICATES, language="en")
