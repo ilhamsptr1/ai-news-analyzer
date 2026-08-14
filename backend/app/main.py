@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routes import articles, health, keywords
+from app.routes import articles, health, keywords, entities
 
 # ---------------------------------------------------------------------------
 # Application instance
@@ -40,8 +40,9 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 app.include_router(health.router, prefix="/api")
-app.include_router(articles.router, prefix="/api/articles")
-app.include_router(keywords.router, prefix="/api/keywords")
+app.include_router(articles.router, prefix="/api/articles", tags=["Articles"])
+app.include_router(keywords.router, prefix="/api/keywords", tags=["Keywords"])
+app.include_router(entities.router, prefix="/api/entities", tags=["Entities"])
 
 # ---------------------------------------------------------------------------
 # Root redirect hint

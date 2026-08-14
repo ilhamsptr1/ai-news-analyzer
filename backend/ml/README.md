@@ -263,9 +263,16 @@ result = clf.predict("The company reported a massive profit increase.")
 
 ---
 
-## Phase 4B-2: Keyword Extraction
+### Phase 4B-2: Keyword Extraction
+* Extracts essential keywords using YAKE.
+* Supports TF-IDF fallback if YAKE fails.
+* Integrated into `/api/keywords/extract`.
 
-Extracts keywords and keyphrases from article text using unsupervised NLP algorithms.
+### Phase 4B-3: Multilingual Named Entity Recognition (NER)
+* Extracts entities like PERSON, ORG, LOC from text.
+* Supports **Indonesian** (`id`) via Hugging Face (`cahya/bert-base-indonesian-NER`).
+* Supports **English** (`en`) via spaCy (`en_core_web_sm`).
+* Unified extractor logic with deduplication and grouping available via `/api/entities/extract`.
 
 ### Algorithm
 

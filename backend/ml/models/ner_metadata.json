@@ -1,0 +1,16 @@
+{
+  "indonesian": {
+    "model": "cahya/bert-base-indonesian-NER",
+    "source": "Hugging Face (transformers pipeline)",
+    "license": "MIT",
+    "version": "1.0",
+    "entity_labels": ["PER", "ORG", "LOC", "GPE"]
+  },
+  "english": {
+    "model": "en_core_web_sm",
+    "source": "spaCy",
+    "license": "MIT",
+    "version": "3.8.0",
+    "entity_labels": ["PERSON", "ORG", "GPE", "LOC", "DATE", "MONEY", "EVENT", "PRODUCT", "MISC", "NORP", "FAC", "WORK_OF_ART", "LAW", "LANGUAGE", "TIME", "PERCENT", "QUANTITY", "ORDINAL", "CARDINAL"]
+  }
+}

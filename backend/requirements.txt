@@ -31,3 +31,8 @@ huggingface-hub>=0.22
 
 # Phase 4B-2 — Keyword Extraction
 yake>=0.4.8
+
+# Phase 4B-3 — Multilingual NER
+spacy>=3.7
+transformers>=4.38
+torch>=2.0
