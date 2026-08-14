@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routes import health
+from app.routes import articles, health
 
 # ---------------------------------------------------------------------------
 # Application instance
@@ -15,7 +15,7 @@ app = FastAPI(
     version=settings.app_version,
     description=(
         "AI-powered news analysis API. "
-        "Provides article extraction, NLP, sentiment analysis, "
+        "Provides article storage, NLP analysis, sentiment detection, "
         "named entity recognition, and news summarisation."
     ),
     docs_url="/api/docs",
@@ -40,6 +40,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 app.include_router(health.router, prefix="/api")
+app.include_router(articles.router, prefix="/api/articles")
 
 # ---------------------------------------------------------------------------
 # Root redirect hint
@@ -52,4 +53,5 @@ async def root():
         "message": f"Welcome to {settings.app_name} API",
         "docs": "/api/docs",
         "health": "/api/health",
+        "articles": "/api/articles",
     }
