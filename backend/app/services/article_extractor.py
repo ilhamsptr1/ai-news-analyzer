@@ -24,12 +24,27 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-HTTP_TIMEOUT_SECONDS = 12
+HTTP_TIMEOUT_SECONDS = 15
 HTTP_MAX_REDIRECTS = 5
-USER_AGENT = "AI-News-Analyzer/1.0 (+https://github.com/ai-news-analyzer)"
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
 
 # Minimum content length — articles shorter than this are likely extraction failures
-MIN_CONTENT_LENGTH = 100
+MIN_CONTENT_LENGTH = 200
+
+# Noise phrases indicating extraction failure (navigation menus, cookie walls, etc.)
+_NOISE_PHRASES = [
+    "enable javascript",
+    "please enable cookies",
+    "you need to enable javascript",
+    "403 forbidden",
+    "access denied",
+    "captcha",
+    "cloudflare",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +100,12 @@ def _make_http_client() -> httpx.Client:
         timeout=httpx.Timeout(HTTP_TIMEOUT_SECONDS),
         follow_redirects=True,
         max_redirects=HTTP_MAX_REDIRECTS,
-        headers={"User-Agent": USER_AGENT},
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+        },
     )
 
 
@@ -108,8 +128,21 @@ def _fetch_html(url: str) -> str:
     except httpx.TimeoutException as exc:
         raise TimeoutError(f"Request timed out after {HTTP_TIMEOUT_SECONDS}s: {url}") from exc
     except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status == 403:
+            raise FetchError(
+                f"Access denied (403): The source website blocked the request for {url}"
+            ) from exc
+        elif status == 429:
+            raise FetchError(
+                f"Rate limited (429): Too many requests to {url}"
+            ) from exc
+        elif status in (502, 503):
+            raise FetchError(
+                f"Source unreachable ({status}): The news server is unavailable for {url}"
+            ) from exc
         raise FetchError(
-            f"HTTP {exc.response.status_code} error fetching {url}"
+            f"HTTP {status} error fetching {url}"
         ) from exc
     except httpx.RequestError as exc:
         raise FetchError(f"Network error fetching {url}: {exc}") from exc
@@ -179,6 +212,12 @@ def _extract_with_trafilatura(html: str, url: str) -> ExtractionResult | None:
             return None
 
         content = clean_text(content_raw)
+        
+        # Quality guard: reject content that looks like noise
+        content_lower = content.lower()
+        if any(phrase in content_lower for phrase in _NOISE_PHRASES[:4]):  # Only most critical noise
+            logger.debug("Trafilatura content looks like noise for %s", url)
+            return None
 
         # Extract title
         title_raw = None
@@ -241,6 +280,9 @@ def _extract_with_beautifulsoup(html: str, url: str) -> ExtractionResult | None:
             ["script", "style", "nav", "footer", "header",
              "aside", "form", "iframe", "noscript", "button"]
         ):
+            # Preserve JSON-LD scripts for metadata extraction
+            if tag.name == "script" and tag.get("type") == "application/ld+json":
+                continue
             tag.decompose()
 
         # Remove common ad/cookie/comment class patterns
@@ -254,6 +296,26 @@ def _extract_with_beautifulsoup(html: str, url: str) -> ExtractionResult | None:
         ):
             tag.decompose()
 
+        # ── Parse JSON-LD for metadata (check early for efficiency) ─────────
+        import json as _json
+        jsonld_data: dict = {}
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                raw = _json.loads(script.string or "")
+                # Handle both single object and @graph array
+                if isinstance(raw, list):
+                    for item in raw:
+                        if isinstance(item, dict) and item.get("@type") in (
+                            "NewsArticle", "Article", "WebPage"
+                        ):
+                            jsonld_data = item
+                            break
+                elif isinstance(raw, dict):
+                    if raw.get("@type") in ("NewsArticle", "Article", "WebPage"):
+                        jsonld_data = raw
+            except (_json.JSONDecodeError, TypeError):
+                continue
+
         # ── Title Extraction ──────────────────────────────────────────────
         title_raw = None
 
@@ -262,11 +324,15 @@ def _extract_with_beautifulsoup(html: str, url: str) -> ExtractionResult | None:
         if og_title and og_title.get("content"):
             title_raw = og_title["content"]
 
-        # 2. <title> tag
+        # 2. JSON-LD headline (often cleaner than og:title or <title>)
+        if not title_raw and jsonld_data.get("headline"):
+            title_raw = jsonld_data["headline"]
+
+        # 3. <title> tag
         if not title_raw and soup.title and soup.title.string:
             title_raw = soup.title.string
 
-        # 3. First <h1>
+        # 4. First <h1> (last resort)
         if not title_raw:
             h1 = soup.find("h1")
             if h1:
@@ -281,29 +347,55 @@ def _extract_with_beautifulsoup(html: str, url: str) -> ExtractionResult | None:
             return None
 
         # ── Content Extraction ────────────────────────────────────────────
-        content_el = (
-            soup.find("article")
-            or soup.find("main")
-            or soup.find(id="content")
-            or soup.find(id="main-content")
-            or soup.find(class_="content")
-            or soup.find("body")
-        )
+        # Try JSON-LD articleBody first (often best for news sites)
+        content_raw = None
+        if jsonld_data.get("articleBody") and len(str(jsonld_data["articleBody"])) > MIN_CONTENT_LENGTH:
+            content_raw = str(jsonld_data["articleBody"])
 
-        if not content_el:
-            return None
+        if not content_raw:
+            # Helper to safely check class names
+            def _has_class(class_names: str | list | None, keyword: str) -> bool:
+                if not class_names:
+                    return False
+                if isinstance(class_names, list):
+                    return any(keyword in c for c in class_names if c)
+                return keyword in class_names
 
-        # Get all paragraphs
-        paragraphs = content_el.find_all("p")
-        if paragraphs:
-            content_raw = "\n\n".join(p.get_text() for p in paragraphs if p.get_text().strip())
-        else:
-            content_raw = content_el.get_text(separator="\n")
+            # Attempt various known content containers (including Indonesian news site patterns)
+            content_el = (
+                soup.find("article")
+                or soup.find("main")
+                or soup.find(id="content")
+                or soup.find(id="main-content")
+                or soup.find(id="article-body")
+                or soup.find(id="detikdetail")
+                or soup.find(attrs={"class": lambda c: _has_class(c, "article-content")})
+                or soup.find(attrs={"class": lambda c: _has_class(c, "article-body")})
+                or soup.find(attrs={"class": lambda c: _has_class(c, "detail-text")})
+                or soup.find(class_="content")
+                or soup.find("body")
+            )
+
+            if not content_el:
+                return None
+
+            # Get all paragraphs
+            paragraphs = content_el.find_all("p")
+            if paragraphs:
+                content_raw = "\n\n".join(p.get_text() for p in paragraphs if p.get_text().strip())
+            else:
+                content_raw = content_el.get_text(separator="\n")
 
         if not content_raw or len(content_raw.strip()) < MIN_CONTENT_LENGTH:
             return None
 
         content = clean_text(content_raw)
+
+        # Quality guard: reject content that looks like noise
+        content_lower = content.lower()
+        if any(phrase in content_lower for phrase in _NOISE_PHRASES[:4]):
+            logger.debug("BeautifulSoup content looks like noise for %s", url)
+            return None
 
         # ── Published Date ────────────────────────────────────────────────
         published_at = None
@@ -320,23 +412,29 @@ def _extract_with_beautifulsoup(html: str, url: str) -> ExtractionResult | None:
                     break
 
         # JSON-LD datePublished fallback
-        if not published_at:
-            import json
-            for script in soup.find_all("script", type="application/ld+json"):
-                try:
-                    data = json.loads(script.string or "")
-                    if isinstance(data, dict) and "datePublished" in data:
-                        published_at = _parse_date(data["datePublished"])
-                        if published_at:
-                            break
-                except (json.JSONDecodeError, TypeError):
-                    continue
+        if not published_at and jsonld_data.get("datePublished"):
+            published_at = _parse_date(jsonld_data["datePublished"])
 
         # ── Author ────────────────────────────────────────────────────────
         author = None
+        # 1. meta author tag
         author_meta = soup.find("meta", attrs={"name": "author"})
         if author_meta and author_meta.get("content"):
             author = author_meta["content"].strip() or None
+
+        # 2. JSON-LD author
+        if not author and jsonld_data.get("author"):
+            jld_author = jsonld_data["author"]
+            if isinstance(jld_author, dict):
+                author = jld_author.get("name", "").strip() or None
+            elif isinstance(jld_author, list) and jld_author:
+                first = jld_author[0]
+                if isinstance(first, dict):
+                    author = first.get("name", "").strip() or None
+                elif isinstance(first, str):
+                    author = first.strip() or None
+            elif isinstance(jld_author, str):
+                author = jld_author.strip() or None
 
         word_count = count_words(content)
         reading_time = estimate_reading_time(word_count)
