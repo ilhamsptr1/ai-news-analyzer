@@ -1,0 +1,18 @@
+# docker-compose.yml
+# Phase 1 — Docker Compose placeholder.
+# Full containerization with PostgreSQL will be configured in Phase 2.
+#
+# Usage (Phase 2+):
+#   docker-compose up -d
+#
+# Services planned:
+#   - backend  (FastAPI)
+#   - frontend (React/Vite via nginx)
+#   - db       (PostgreSQL)
+
+version: "3.9"
+
+services:
+  # ── Placeholder ──────────────────────────────────────────────────────────
+  # Services will be fully defined in Phase 2.
+  # ─────────────────────────────────────────────────────────────────────────
