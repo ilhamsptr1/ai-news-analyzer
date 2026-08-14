@@ -60,4 +60,14 @@ export async function listArticles(skip = 0, limit = 20) {
   return get(`/api/articles?skip=${skip}&limit=${limit}`);
 }
 
-export default { checkHealth, extractArticle, listArticles };
+/**
+ * Run the full AI analysis pipeline on a URL.
+ * @param {string} url - The public article URL.
+ * @param {number} [topKeywords=10]
+ * @returns {Promise<ArticleAnalyzeResponse | UnsupportedLanguageResponse>}
+ */
+export async function analyzeArticle(url, topKeywords = 10) {
+  return post('/api/articles/analyze', { url, top_keywords: topKeywords });
+}
+
+export default { checkHealth, extractArticle, listArticles, analyzeArticle };

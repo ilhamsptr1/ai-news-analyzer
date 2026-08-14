@@ -1,28 +1,30 @@
 /**
  * App.jsx — Root application component.
- * Phase 3: Added Article Extraction page.
+ * Phase 5C-1: Added AI Analysis page.
  */
 
 import { useState } from 'react';
 import ArticleExtractor from './components/ArticleExtractor';
+import NewsAnalyzer from './components/NewsAnalyzer';
 import StatusBadge from './components/StatusBadge';
 
 const NAV_TABS = [
-  { id: 'home', label: '🏠 Home' },
-  { id: 'extract', label: '⚡ Extract Article' },
+  { id: 'home',    label: '🏠 Home' },
+  { id: 'analyze', label: '🤖 Analyze' },
+  { id: 'extract', label: '⚡ Extract' },
 ];
 
 const FEATURES = [
-  { icon: '📰', label: 'Article Extraction', phase: '3', done: true },
-  { icon: '🧠', label: 'AI / NLP Analysis', phase: '4' },
-  { icon: '😊', label: 'Sentiment Analysis', phase: '4' },
-  { icon: '🏷️', label: 'News Classification', phase: '4' },
-  { icon: '🔑', label: 'Keyword Extraction', phase: '4' },
-  { icon: '👤', label: 'Named Entity Recognition', phase: '4' },
-  { icon: '📝', label: 'News Summary', phase: '5' },
-  { icon: '🐘', label: 'PostgreSQL Database', phase: '2', done: true },
-  { icon: '📡', label: 'News API', phase: '5' },
-  { icon: '📊', label: 'Analytics Dashboard', phase: '6' },
+  { icon: '📰', label: 'Article Extraction',       phase: '3', done: true  },
+  { icon: '🧠', label: 'AI / NLP Analysis',        phase: '5', done: true  },
+  { icon: '😊', label: 'Sentiment Analysis',        phase: '4', done: true  },
+  { icon: '🏷️', label: 'News Classification',      phase: '4', done: true  },
+  { icon: '🔑', label: 'Keyword Extraction',        phase: '4', done: true  },
+  { icon: '👤', label: 'Named Entity Recognition',  phase: '4', done: true  },
+  { icon: '🌐', label: 'Language Detection',        phase: '4', done: true  },
+  { icon: '🐘', label: 'PostgreSQL Database',       phase: '2', done: true  },
+  { icon: '📊', label: 'Analytics Dashboard',       phase: '6'              },
+  { icon: '📡', label: 'News Feed API',             phase: '6'              },
 ];
 
 export default function App() {
@@ -45,7 +47,6 @@ export default function App() {
             <span className="navbar-badge">AI</span>
           </a>
 
-          {/* Tab Navigation */}
           <div className="navbar-tabs" role="tablist" aria-label="Page tabs">
             {NAV_TABS.map((tab) => (
               <button
@@ -61,7 +62,7 @@ export default function App() {
             ))}
           </div>
 
-          <span className="navbar-phase-tag">Phase 3 — Extraction</span>
+          <span className="navbar-phase-tag">Phase 5C — Full Pipeline</span>
         </nav>
 
         {/* ── Main Content ── */}
@@ -72,32 +73,40 @@ export default function App() {
             <div className="hero" role="tabpanel" aria-labelledby="tab-home">
               <div className="hero-eyebrow" role="text">
                 <span className="hero-eyebrow-dot" aria-hidden="true" />
-                Intelligent News Intelligence Platform
+                Multilingual News Intelligence Platform
               </div>
 
               <h1 className="hero-title">
-                <span className="hero-title-gradient">AI News</span>
+                <span className="hero-title-gradient">Understand</span>
                 <br />
-                Analyzer
+                Every Story.
               </h1>
 
               <p className="hero-subtitle">
-                Analyze news articles using AI & NLP — sentiment analysis, named
-                entity recognition, keyword extraction, and automated summarization,
-                all in one platform.
+                Analyze news articles using AI &amp; NLP — automatic language detection,
+                sentiment analysis, named entity recognition, keyword extraction,
+                and category classification, all in one pipeline.
               </p>
 
               <StatusBadge />
 
-              {/* Quick start CTA */}
+              {/* CTA */}
               <div className="hero-cta-row">
                 <button
                   className="hero-cta-btn"
+                  onClick={() => setActiveTab('analyze')}
+                  aria-label="Go to article analysis"
+                  id="hero-analyze-cta"
+                >
+                  🤖 Analyze an Article
+                </button>
+                <button
+                  className="hero-cta-btn hero-cta-btn--secondary"
                   onClick={() => setActiveTab('extract')}
-                  aria-label="Go to article extraction"
+                  aria-label="Extract only"
                   id="hero-extract-cta"
                 >
-                  ⚡ Extract Your First Article
+                  ⚡ Extract Only
                 </button>
               </div>
 
@@ -107,7 +116,7 @@ export default function App() {
                   <div
                     key={label}
                     className={`feature-pill ${done ? 'feature-pill--done' : ''}`}
-                    title={done ? `Available in Phase ${phase}` : `Coming in Phase ${phase}`}
+                    title={done ? `Available — Phase ${phase}` : `Coming in Phase ${phase}`}
                   >
                     <span aria-hidden="true">{icon}</span>
                     {label}
@@ -117,6 +126,17 @@ export default function App() {
                   </div>
                 ))}
               </section>
+            </div>
+          )}
+
+          {/* ── ANALYZE TAB ── */}
+          {activeTab === 'analyze' && (
+            <div
+              className="extract-tab-content"
+              role="tabpanel"
+              aria-labelledby="tab-analyze"
+            >
+              <NewsAnalyzer />
             </div>
           )}
 
@@ -135,7 +155,7 @@ export default function App() {
         {/* ── Footer ── */}
         <footer className="footer" role="contentinfo">
           <p>
-            AI News Analyzer — Phase 3 &middot; Built with{' '}
+            AI News Analyzer — Phase 5C &middot; Built with{' '}
             <a href="https://fastapi.tiangolo.com/" target="_blank" rel="noopener noreferrer">
               FastAPI
             </a>{' '}
