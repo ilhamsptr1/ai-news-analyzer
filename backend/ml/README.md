@@ -309,3 +309,67 @@ On a 200-word article about Apple AI chip:
 | TF-IDF    | ~16ms   | Good single-word terms, less context |
 
 > Note: No ground-truth annotation available for accuracy comparison. These are qualitative observations on a manual sample.
+
+---
+
+## Phase 4A-ID: Indonesian News Category Classification
+
+Implements an Indonesian-specific category classification pipeline to handle articles detected as Indonesian language. The architecture routes English articles to the Phase 4A model and Indonesian articles to this model.
+
+### Dataset
+
+| Field       | Value |
+|-------------|-------|
+| **Name**    | indonesian_news_datasets |
+| **Source**  | Hugging Face Hub (`fahadh4ilyas/indonesian_news_datasets`) |
+| **License** | CC-BY-NC-4.0 |
+| **Total**   | 32,294 samples (25,835 train + 6,459 test) |
+| **Columns** | `text` (title + content), `label` |
+
+> ⚠️ **IMPORTANT NOTE ON LABEL QUALITY**: The labels in this dataset were **automatically generated** by an LLM (`Qwen3-30B-A3B-Instruct-2507-FP8`) and have **NOT been human-curated**. The model's accuracy metrics reflect its ability to mimic the LLM's classification, not necessarily a gold-standard ground truth.
+
+### Categories
+
+The dataset contains 6 categories:
+1. `BENCANA_LINGKUNGAN` (Disaster & Environment)
+2. `EKONOMI_BISNIS` (Economy & Business)
+3. `HUKUM_KRIMINAL` (Law & Crime)
+4. `OLAHRAGA` (Sports)
+5. `POLITIK_PEMERINTAHAN` (Politics & Government)
+6. `TEKNOLOGI_DIGITAL` (Technology & Digital)
+
+### Preprocessing
+
+- **Field combination**: Concatenates `title` and the first 2000 characters of `content` to provide sufficient context while reducing noise from extremely long articles.
+- **Cleaning**: Minimal cleaning is performed. HTML tags/entities and control characters are removed. Unicode is normalized (NFC). Stop words and negations (e.g., "tidak", "bukan") are intentionally preserved as they carry important contextual meaning in Indonesian. No stemming is applied.
+
+### Models and Algorithm
+
+Baseline evaluation compared three classical ML approaches:
+1. **Multinomial Naive Bayes**
+2. **Logistic Regression** (class_weight="balanced")
+3. **Linear SVM** (CalibratedClassifierCV, class_weight="balanced")
+
+Features are extracted using `TfidfVectorizer` (ngram_range=(1,2), max_features=80,000, lowercase=True).
+
+### Model Selection and Evaluation
+
+The **Linear SVM** model typically achieves the best balance of Accuracy and Macro F1 score on the native test set. Refer to `ml/models/news_category_id_metadata.json` for exact performance metrics of the trained artifact.
+
+### Modules
+
+| File | Description |
+|------|-------------|
+| `ml/scripts/indonesian_preprocess.py` | Data loading and Indonesian-specific text cleaning |
+| `ml/scripts/train_indonesian_classifier.py` | Training pipeline, hyperparameter tuning, and evaluation |
+| `app/ai/indonesian_category_classifier.py` | Inference wrapper (singleton, lazy-loading) |
+
+### API / Inference Usage
+
+```python
+from app.ai.indonesian_category_classifier import get_indonesian_classifier
+
+clf = get_indonesian_classifier()
+result = clf.predict("Pemerintah Indonesia mengumumkan kebijakan ekonomi baru.")
+# -> {"category": "EKONOMI_BISNIS", "confidence": 0.95, "all_scores": {...}}
+```
