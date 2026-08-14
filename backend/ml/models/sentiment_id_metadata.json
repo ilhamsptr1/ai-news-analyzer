@@ -1,0 +1,27 @@
+{
+  "language": "id",
+  "model_name": "Logistic Regression",
+  "dataset": "intanm/indonesian-financial-sentiment-analysis",
+  "dataset_source": "Hugging Face Hub",
+  "dataset_license": "Unknown (Academic/Research)",
+  "dataset_domain": "Indonesian Financial News Headlines",
+  "label_origin": "Human Annotated",
+  "classes": [
+    "Negative",
+    "Neutral",
+    "Positive"
+  ],
+  "accuracy": 0.7607,
+  "macro_f1": 0.7616,
+  "weighted_f1": 0.7596,
+  "training_date": "2026-08-14T08:23:10.547700+00:00",
+  "version": "1.0.0",
+  "phase": "4B-1-ID",
+  "train_samples": 1122,
+  "val_samples": 198,
+  "test_samples": 652,
+  "random_state": 42,
+  "tfidf_lowercase": true,
+  "calibration": null,
+  "text_strategy": "text only"
+}

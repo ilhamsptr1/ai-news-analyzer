@@ -173,6 +173,40 @@ The model is loaded **lazily** — only on first call. It is cached for the life
 | Test set | AG News native test (7,600 samples, never seen during training) |
 | TF-IDF fit | Training data only (no leakage to val/test) |
 
+## Indonesian News Category Classification (Phase 4A-ID)
+
+A specialized category classifier for Indonesian news articles.
+
+- **Dataset**: `fahadh4ilyas/indonesian_news_datasets` (Hugging Face)
+- **Domain**: Indonesian News
+- **Label Origin**: LLM Generated (Qwen3-30B) - automatically generated, not human annotated.
+- **Classes**: POLITIK_PEMERINTAHAN, EKONOMI_BISNIS, HUKUM_KRIMINAL, OLAHRAGA, TEKNOLOGI_DIGITAL, BENCANA_LINGKUNGAN.
+- **Model Type**: Calibrated Linear SVM with TF-IDF Vectorization.
+- **Performance**:
+  - Test Accuracy: ~88.42%
+  - Macro F1: ~0.8315
+- **Features**: Lazy-loaded singleton, probability-calibrated output, robust Indonesian text preprocessing (preserves stopwords and negations).
+
+## Indonesian News Sentiment Analysis (Phase 4B-1-ID)
+
+A specialized sentiment analysis classifier for Indonesian news articles.
+
+- **Dataset**: `intanm/indonesian-financial-sentiment-analysis` (Hugging Face)
+- **Domain**: Indonesian Financial News Headlines
+- **Label Origin**: Human Annotated
+- **Classes**: Negative, Neutral, Positive.
+- **Model Type**: Logistic Regression with TF-IDF Vectorization.
+- **Performance**:
+  - Test Accuracy: ~76.07%
+  - Macro F1: ~0.7616
+- **Features**: 
+  - Model loaded lazily via singleton (`IndonesianSentimentClassifier`).
+  - Text preprocessing strictly preserves negation words (`tidak`, `bukan`, `belum`) to maintain sentiment context.
+  - Returns probability/confidence via Logistic Regression's native `predict_proba`.
+- **Note**: This model is explicitly tailored for Indonesian text and supplements the English sentiment model. A language router will direct traffic to the appropriate model.
+
+## Setup & Training data only (no leakage to val/test) |
+
 ---
 
 ## Important Notes
