@@ -141,8 +141,8 @@ class TestDatabaseConnection:
             tables = {row[0] for row in result}
         assert "articles" in tables
         assert "analyses" in tables
-        assert "keywords" in tables
-        assert "entities" in tables
+        assert "analysis_keywords" in tables
+        assert "analysis_entities" in tables
         assert "alembic_version" in tables
 
 
@@ -362,16 +362,18 @@ class TestRelationships:
 
         entity = Entity(
             analysis_id=analysis.id,
-            entity="OpenAI",
-            entity_type="ORGANIZATION",
+            text="OpenAI",
+            label="ORGANIZATION",
+            start_position=0,
+            end_position=6,
             score=0.99,
         )
         db_session.add(entity)
         db_session.flush()
 
         assert entity.analysis_id == analysis.id
-        assert entity.entity == "OpenAI"
-        assert entity.entity_type == "ORGANIZATION"
+        assert entity.text == "OpenAI"
+        assert entity.label == "ORGANIZATION"
 
     def test_cascade_delete_article_deletes_analysis(self, db_session):
         """Deleting article must cascade-delete its analyses."""
