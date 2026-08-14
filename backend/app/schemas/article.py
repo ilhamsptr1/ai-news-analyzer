@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class ArticleCreate(BaseModel):
-    """Schema for creating a new article."""
+    """Schema for creating a new article manually."""
 
     title: str = Field(..., min_length=1, max_length=500, description="Article title")
     url: str | None = Field(
@@ -22,9 +22,7 @@ class ArticleCreate(BaseModel):
     source: str | None = Field(
         default=None, max_length=255, description="News source name"
     )
-    content: str = Field(
-        ..., min_length=10, description="Full article text content"
-    )
+    content: str = Field(..., min_length=10, description="Full article text content")
     published_at: datetime | None = Field(
         default=None, description="Original publication date"
     )
@@ -37,6 +35,23 @@ class ArticleUpdate(BaseModel):
     source: str | None = Field(default=None, max_length=255)
     content: str | None = Field(default=None, min_length=10)
     published_at: datetime | None = None
+
+
+class ArticleExtractRequest(BaseModel):
+    """Schema for the POST /api/articles/extract endpoint."""
+
+    url: str = Field(
+        ...,
+        min_length=10,
+        max_length=2048,
+        description="Public URL of the news article to extract",
+        examples=["https://example.com/news/article-title"],
+    )
+
+    @field_validator("url")
+    @classmethod
+    def url_must_be_stripped(cls, v: str) -> str:
+        return v.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +69,10 @@ class ArticleResponse(BaseModel):
     url: str | None
     source: str | None
     content: str
+    author: str | None
     published_at: datetime | None
+    word_count: int | None
+    reading_time: int | None
     created_at: datetime
     updated_at: datetime
 

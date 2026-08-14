@@ -11,3 +11,10 @@ sqlalchemy==2.0.52
 psycopg[binary]==3.3.4
 alembic==1.19.1
 sqlalchemy-utils==0.42.1
+
+# Phase 3 — Article Extraction
+trafilatura>=2.0
+beautifulsoup4>=4.12
+lxml>=5.0
+lxml_html_clean>=0.4
+python-dateutil>=2.9

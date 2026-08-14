@@ -5,26 +5,31 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-/**
- * Perform a GET request to the backend.
- * @param {string} path - The API path (e.g. '/api/health')
- * @returns {Promise<any>} Parsed JSON response
- */
+/** Generic GET request */
 async function get(path) {
-  const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
   });
-
   if (!response.ok) {
-    throw new Error(`HTTP error — status: ${response.status}`);
+    const err = await response.json().catch(() => ({}));
+    throw { status: response.status, detail: err.detail || `HTTP ${response.status}` };
   }
-
   return response.json();
+}
+
+/** Generic POST request */
+async function post(path, body) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw { status: response.status, detail: data.detail || `HTTP ${response.status}` };
+  }
+  return data;
 }
 
 /**
@@ -35,4 +40,24 @@ export async function checkHealth() {
   return get('/api/health');
 }
 
-export default { checkHealth };
+/**
+ * Extract and save an article from a public URL.
+ * @param {string} url - The public article URL.
+ * @returns {Promise<ArticleResponse>}
+ * @throws {{ status: number, detail: string }} on error
+ */
+export async function extractArticle(url) {
+  return post('/api/articles/extract', { url });
+}
+
+/**
+ * List stored articles (paginated).
+ * @param {number} skip
+ * @param {number} limit
+ * @returns {Promise<{ total: number, articles: ArticleResponse[] }>}
+ */
+export async function listArticles(skip = 0, limit = 20) {
+  return get(`/api/articles?skip=${skip}&limit=${limit}`);
+}
+
+export default { checkHealth, extractArticle, listArticles };
