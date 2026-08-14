@@ -7,6 +7,7 @@ Multilingual support for Indonesian and English.
 """
 
 import logging
+import string
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,18 @@ class NERExtractor:
 
         entities = []
 
+        def _is_valid_entity(text: str, label: str) -> bool:
+            text = text.strip()
+            if len(text) <= 1:
+                return False
+            # Filter pure digits that are 4 characters or less (often Wikipedia noise like years or brackets)
+            if text.isdigit() and len(text) <= 4:
+                return False
+            # Filter punctuation or whitespace only
+            if all(c in string.punctuation or c.isspace() for c in text):
+                return False
+            return True
+
         if language == "id":
             model = self._load_indonesian()
             model_name = "cahya/bert-base-indonesian-NER"
@@ -72,41 +85,54 @@ class NERExtractor:
             for ent in raw_ents:
                 start_idx = ent["start"]
                 end_idx = ent["end"]
-                entities.append({
-                    "text": safe_text[start_idx:end_idx],
-                    "label": ent["entity_group"],
-                    "start": start_idx,
-                    "end": end_idx,
-                    "score": round(float(ent["score"]), 4),
-                })
+                text_slice = safe_text[start_idx:end_idx]
+                label = ent["entity_group"]
+                
+                if _is_valid_entity(text_slice, label):
+                    entities.append({
+                        "text": text_slice,
+                        "label": label,
+                        "start": start_idx,
+                        "end": end_idx,
+                        "score": round(float(ent["score"]), 4),
+                    })
         else:
             model = self._load_english()
             model_name = "en_core_web_sm"
             # spaCy can handle larger texts, up to ~1,000,000 chars by default, but we enforce 500,000 in schema
             doc = model(text)
             for ent in doc.ents:
-                entities.append({
-                    "text": ent.text,
-                    "label": ent.label_,
-                    "start": ent.start_char,
-                    "end": ent.end_char,
-                    "score": None,  # spaCy does not easily expose NER confidence out of the box
-                })
+                if _is_valid_entity(ent.text, ent.label_):
+                    entities.append({
+                        "text": ent.text,
+                        "label": ent.label_,
+                        "start": ent.start_char,
+                        "end": ent.end_char,
+                        "score": None,  # spaCy does not easily expose NER confidence out of the box
+                    })
+
+        # Deduplicate entities before returning
+        unique_entities = self.get_unique_entities(entities)
 
         return {
             "language": language,
             "model": model_name,
-            "entities": entities,
+            "entities": unique_entities,
         }
 
     @staticmethod
     def get_unique_entities(entities: list[dict]) -> list[dict]:
         """
         Deduplicates a list of entities based on text and label, keeping the one with the highest score.
+        Case-insensitive for text matching, but preserves the original casing.
         """
         unique = {}
         for ent in entities:
-            key = (ent["text"], ent["label"])
+            # Normalize key for deduplication
+            norm_text = ent["text"].strip().lower()
+            norm_label = ent["label"].upper()
+            key = (norm_text, norm_label)
+            
             if key not in unique:
                 unique[key] = ent
             else:

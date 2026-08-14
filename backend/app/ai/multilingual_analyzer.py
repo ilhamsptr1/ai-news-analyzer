@@ -113,9 +113,9 @@ class MultilingualAnalyzer:
         sentiment_result = self._classify_sentiment(text, lang_code)
 
         # ------------------------------------------------------------------
-        # 5. Keyword extraction (language-agnostic)
+        # 5. Keyword extraction (language-agnostic algorithm, but language-aware stopwords)
         # ------------------------------------------------------------------
-        keyword_result = self._extract_keywords(text, top_keywords)
+        keyword_result = self._extract_keywords(text, top_keywords, lang_code)
 
         # ------------------------------------------------------------------
         # 6. Named Entity Recognition
@@ -199,12 +199,12 @@ class MultilingualAnalyzer:
             logger.error("Sentiment classification error (%s): %s", lang, exc, exc_info=True)
             return {"sentiment": "Unknown", "confidence": 0.0, "all_scores": {}}
 
-    def _extract_keywords(self, text: str, top_n: int) -> dict:
-        """Extract keywords (language-agnostic)."""
+    def _extract_keywords(self, text: str, top_n: int, lang: str) -> dict:
+        """Extract keywords."""
         try:
             from app.ai.keyword_extractor import get_keyword_extractor
             extractor = get_keyword_extractor()
-            result = extractor.extract(text=text, top_n=top_n)
+            result = extractor.extract(text=text, top_n=top_n, language=lang)
             return {
                 "keywords": result.get("keywords", []),
                 "method": result.get("method", "yake"),

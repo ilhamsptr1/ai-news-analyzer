@@ -38,11 +38,20 @@ _YAKE_DEDUP_FUNC = "seqm"    # string sequence matching for dedup
 _YAKE_WINDOW_SIZE = 1        # word window for context
 
 # Stopwords for final filtering (catches edge cases YAKE misses)
-_STOPWORD_SET = {
+_STOPWORD_EN = {
     "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
     "of", "with", "by", "from", "as", "into", "this", "that", "is", "are",
     "was", "were", "it", "its", "he", "she", "they", "we", "who", "which",
     "said", "such", "more", "all", "any", "one", "also", "just", "so",
+}
+
+# Indonesian stopwords
+_STOPWORD_ID = {
+    "dan", "yang", "pada", "dari", "untuk", "dengan", "adalah", "atau",
+    "di", "ke", "dalam", "ini", "itu", "sebuah", "suatu", "sebagai",
+    "oleh", "kepada", "saat", "bahwa", "serta", "karena", "bagi",
+    "seperti", "telah", "akan", "dapat", "bisa", "harus", "ada",
+    "tersebut", "tentang", "setelah", "jika", "lagi", "namun", "ketika",
 }
 
 _PUNCT_ONLY = re.compile(r"^[^a-zA-Z0-9]+$")
@@ -80,7 +89,7 @@ def _clean_text(text: str) -> str:
 # Keyword quality filtering
 # ---------------------------------------------------------------------------
 
-def _is_valid_keyword(kw: str) -> bool:
+def _is_valid_keyword(kw: str, language: str = "en") -> bool:
     """Check if a keyword passes basic quality filters."""
     kw = kw.strip()
     if not kw or len(kw) < MIN_KEYWORD_LEN:
@@ -89,10 +98,16 @@ def _is_valid_keyword(kw: str) -> bool:
         return False
     if _DIGITS_ONLY.match(kw):
         return False
+    
     # All tokens are stopwords?
     tokens = kw.lower().split()
-    if all(t in _STOPWORD_SET for t in tokens):
+    stopword_set = _STOPWORD_ID if language == "id" else _STOPWORD_EN
+    
+    # Exclude negation words from being treated as pure stopword keywords
+    # if they somehow end up alone, but usually they are filtered if all tokens are stopwords.
+    if all(t in stopword_set for t in tokens):
         return False
+        
     return True
 
 
@@ -135,13 +150,14 @@ class KeywordExtractor:
             max_features=5_000,
         )
 
-    def extract(self, text: str, top_n: int = DEFAULT_TOP_N) -> dict:
+    def extract(self, text: str, top_n: int = DEFAULT_TOP_N, language: str = "en") -> dict:
         """
         Extract keywords from text.
 
         Args:
-            text  : Article text (plain or lightly HTML-mixed).
-            top_n : Maximum keywords to return (1-20).
+            text     : Article text (plain or lightly HTML-mixed).
+            top_n    : Maximum keywords to return (1-20).
+            language : Language of the text ("id" or "en").
 
         Returns:
             {
@@ -174,7 +190,7 @@ class KeywordExtractor:
 
         # ── Try YAKE ──────────────────────────────────────────────────
         try:
-            keywords = self._extract_yake(cleaned, top_n)
+            keywords = self._extract_yake(cleaned, top_n, language)
             return {"keywords": keywords, "method": "yake"}
 
         except Exception as exc:
@@ -192,7 +208,7 @@ class KeywordExtractor:
 
     # ── Private: YAKE ──────────────────────────────────────────────────
 
-    def _extract_yake(self, text: str, top_n: int) -> list[dict]:
+    def _extract_yake(self, text: str, top_n: int, language: str) -> list[dict]:
         """Run YAKE on text and return filtered, deduplicated results."""
         import yake  # lazy import so module loads even if yake not installed
 
@@ -214,7 +230,7 @@ class KeywordExtractor:
         items = [
             {"keyword": kw, "score": round(float(score), 6)}
             for kw, score in raw_keywords
-            if _is_valid_keyword(kw)
+            if _is_valid_keyword(kw, language)
         ]
 
         # YAKE: sort ascending (lower score = more important)

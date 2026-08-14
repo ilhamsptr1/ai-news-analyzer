@@ -3,25 +3,27 @@
  */
 
 const LABEL_CONFIG = {
-  PER:    { icon: '👤', label: 'Person',        color: 'blue'   },
-  PERSON: { icon: '👤', label: 'Person',        color: 'blue'   },
-  ORG:    { icon: '🏢', label: 'Organization',  color: 'purple' },
-  LOC:    { icon: '📍', label: 'Location',      color: 'green'  },
-  GPE:    { icon: '🌏', label: 'Place / Region',color: 'green'  },
-  DATE:   { icon: '📅', label: 'Date',          color: 'orange' },
-  TIME:   { icon: '⏰', label: 'Time',          color: 'orange' },
-  CARDINAL: { icon: '🔢', label: 'Number',      color: 'gray'   },
-  MONEY:  { icon: '💰', label: 'Money',         color: 'yellow' },
-  PRODUCT:{ icon: '📦', label: 'Product',       color: 'teal'   },
-  EVENT:  { icon: '📣', label: 'Event',         color: 'red'    },
+  PERSON:       { icon: '👤', label: 'Person',        color: 'blue'   },
+  ORGANIZATION: { icon: '🏢', label: 'Organization',  color: 'purple' },
+  LOCATION:     { icon: '📍', label: 'Location',      color: 'green'  },
+  DATE:         { icon: '📅', label: 'Date',          color: 'orange' },
+  NUMBER:       { icon: '🔢', label: 'Number',        color: 'gray'   },
+  OTHER:        { icon: '🏷️', label: 'Other',         color: 'gray'   },
 };
 
+// Map raw backend labels to frontend categories
+function normalizeLabel(label) {
+  const upper = label ? label.toUpperCase() : '';
+  if (['PER', 'PERSON'].includes(upper)) return 'PERSON';
+  if (['ORG', 'ORGANIZATION'].includes(upper)) return 'ORGANIZATION';
+  if (['LOC', 'GPE', 'LOCATION'].includes(upper)) return 'LOCATION';
+  if (['DATE', 'TIME'].includes(upper)) return 'DATE';
+  if (['NUM', 'QUANTITY', 'CARDINAL', 'MONEY', 'PERCENT', 'NUMBER'].includes(upper)) return 'NUMBER';
+  return 'OTHER';
+}
+
 function getConfig(label) {
-  return (
-    LABEL_CONFIG[label?.toUpperCase()] ||
-    LABEL_CONFIG[label] ||
-    { icon: '🏷️', label: label || 'Other', color: 'gray' }
-  );
+  return LABEL_CONFIG[label] || LABEL_CONFIG.OTHER;
 }
 
 export default function EntityList({ entities }) {
@@ -37,19 +39,19 @@ export default function EntityList({ entities }) {
     );
   }
 
-  // Group by label
+  // Group by normalized label
   const grouped = entities.reduce((acc, ent) => {
-    const key = ent.label || 'Other';
+    const key = normalizeLabel(ent.label);
     if (!acc[key]) acc[key] = [];
     acc[key].push(ent);
     return acc;
   }, {});
 
   // Sort groups by priority
-  const PRIORITY = ['PER', 'PERSON', 'ORG', 'LOC', 'GPE', 'DATE', 'TIME'];
+  const PRIORITY = ['PERSON', 'ORGANIZATION', 'LOCATION', 'DATE', 'NUMBER', 'OTHER'];
   const sortedKeys = Object.keys(grouped).sort((a, b) => {
-    const ai = PRIORITY.indexOf(a.toUpperCase());
-    const bi = PRIORITY.indexOf(b.toUpperCase());
+    const ai = PRIORITY.indexOf(a);
+    const bi = PRIORITY.indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
     if (ai === -1) return 1;
     if (bi === -1) return -1;

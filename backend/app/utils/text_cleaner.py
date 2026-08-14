@@ -48,6 +48,9 @@ def clean_text(text: str) -> str:
     # Remove null bytes
     text = text.replace("\x00", "")
 
+    # Remove Wikipedia artifacts: [sunting], [sunting sumber], [1], [a]
+    text = re.sub(r"\[(?:sunting(?: sumber)?|\d+|[a-z])\]", "", text, flags=re.IGNORECASE)
+
     # Remove control characters except newline (\n) and tab (\t)
     text = re.sub(r"[\x01-\x08\x0b-\x0c\x0e-\x1f\x7f]", "", text)
 
