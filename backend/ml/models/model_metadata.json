@@ -1,0 +1,58 @@
+{
+  "model_name": "Linear SVM",
+  "dataset": "AG News",
+  "dataset_url": "https://huggingface.co/datasets/fancyzhx/ag_news",
+  "dataset_license": "Unknown / Public use for research and portfolio",
+  "categories": [
+    "Business",
+    "Sports",
+    "Technology",
+    "World"
+  ],
+  "num_categories": 4,
+  "label_mapping": {
+    "0": "World",
+    "1": "Sports",
+    "2": "Business",
+    "3": "Technology"
+  },
+  "text_column": "text",
+  "train_samples": 101932,
+  "val_samples": 17989,
+  "test_samples": 7600,
+  "accuracy": 0.9216,
+  "macro_f1": 0.9214,
+  "weighted_f1": 0.9214,
+  "val_results": {
+    "Naive Bayes": {
+      "accuracy": 0.9055,
+      "macro_f1": 0.9053,
+      "weighted_f1": 0.9053
+    },
+    "Logistic Regression": {
+      "accuracy": 0.9202,
+      "macro_f1": 0.9201,
+      "weighted_f1": 0.9201
+    },
+    "Linear SVM": {
+      "accuracy": 0.9228,
+      "macro_f1": 0.9227,
+      "weighted_f1": 0.9227
+    }
+  },
+  "tfidf_params": {
+    "ngram_range": "(1, 2)",
+    "min_df": "2",
+    "max_df": "0.95",
+    "sublinear_tf": "True",
+    "max_features": "100000",
+    "strip_accents": "unicode",
+    "analyzer": "word",
+    "token_pattern": "(?u)\\b[a-zA-Z][a-zA-Z]+\\b"
+  },
+  "random_state": 42,
+  "validation_size": 0.15,
+  "training_date": "2026-08-14T07:33:20.227955+00:00",
+  "version": "1.0.0",
+  "phase": "4A"
+}

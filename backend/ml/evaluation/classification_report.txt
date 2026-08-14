@@ -1,0 +1,28 @@
+AI News Analyzer — Phase 4A Classification Report
+=======================================================
+Dataset:       AG News (fancyzhx/ag_news)
+Best Model:    Linear SVM
+Test Accuracy: 0.9216
+Macro F1:      0.9214
+Weighted F1:   0.9214
+=======================================================
+
+Validation results for all models:
+  Naive Bayes: Acc=0.9055 MacroF1=0.9053
+  Logistic Regression: Acc=0.9202 MacroF1=0.9201
+  Linear SVM: Acc=0.9228 MacroF1=0.9227
+
+=======================================================
+Classification Report (Test Set):
+=======================================================
+
+              precision    recall  f1-score   support
+
+    Business       0.89      0.89      0.89      1900
+      Sports       0.96      0.98      0.97      1900
+  Technology       0.90      0.91      0.90      1900
+       World       0.94      0.91      0.92      1900
+
+    accuracy                           0.92      7600
+   macro avg       0.92      0.92      0.92      7600
+weighted avg       0.92      0.92      0.92      7600

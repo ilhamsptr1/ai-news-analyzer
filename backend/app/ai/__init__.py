@@ -1,1 +1,1 @@
-"""AI package — NLP and ML modules (Phase 2+)"""
+"""AI package — machine learning inference modules."""

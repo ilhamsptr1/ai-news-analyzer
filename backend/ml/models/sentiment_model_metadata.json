@@ -1,0 +1,20 @@
+{
+  "model_name": "Linear SVM",
+  "dataset": "zeroshot/twitter-financial-news-sentiment",
+  "dataset_source": "Hugging Face Hub",
+  "categories": [
+    "Negative",
+    "Neutral",
+    "Positive"
+  ],
+  "accuracy": 0.8335,
+  "macro_f1": 0.7611,
+  "weighted_f1": 0.8273,
+  "training_date": "2026-08-14T07:40:23.337729+00:00",
+  "version": "1.0.0",
+  "phase": "4B-1",
+  "train_samples": 7997,
+  "val_samples": 1412,
+  "test_samples": 2372,
+  "random_state": 42
+}

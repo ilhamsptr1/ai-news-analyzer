@@ -39,3 +39,20 @@ desktop.ini
 # ─── Logs ───────────────────────────────────────────────────
 *.log
 logs/
+
+# ─── ML / Phase 4A ──────────────────────────────────────────
+# Raw datasets (can be large — re-download via script)
+backend/ml/data/raw/
+
+# HuggingFace download cache
+.cache/huggingface/
+
+# Processed numpy/arrow caches from datasets library
+backend/ml/data/processed/
+
+# Large model files (> 50 MB — add to git only if small enough)
+# Uncomment if model is too large:
+# backend/ml/models/*.joblib
+
+# Jupyter checkpoints
+backend/ml/notebooks/.ipynb_checkpoints/

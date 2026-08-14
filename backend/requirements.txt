@@ -18,3 +18,16 @@ beautifulsoup4>=4.12
 lxml>=5.0
 lxml_html_clean>=0.4
 python-dateutil>=2.9
+
+# Phase 4A — ML / Classification
+scikit-learn>=1.4
+joblib>=1.3
+pandas>=2.0
+numpy>=1.26
+matplotlib>=3.8
+seaborn>=0.13
+datasets>=2.18
+huggingface-hub>=0.22
+
+# Phase 4B-2 — Keyword Extraction
+yake>=0.4.8
