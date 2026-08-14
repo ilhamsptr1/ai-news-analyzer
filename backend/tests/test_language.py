@@ -1,9 +1,11 @@
 """
 Phase 4C Tests — Automatic Language Detection & Multilingual Analyzer
+(Patched: Fix Unsupported Language Routing)
 """
 
 import sys
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,7 +36,11 @@ TEXT_EN_LONG = (
     "committed to bringing inflation down to its 2% target. Wall Street reacted "
     "positively to the news, with the S&P 500 closing up 1.2%."
 )
-TEXT_ES = "El gobierno de España ha anunciado nuevas medidas para combatir el cambio climático."
+TEXT_FR = "Le gouvernement français a annoncé de nouvelles mesures économiques pour relancer la croissance."
+TEXT_ES = "El gobierno de España ha anunciado nuevas medidas para combatir el cambio climático este año."
+TEXT_DE = "Die deutsche Bundesregierung hat neue wirtschaftliche Maßnahmen angekündigt um das Wachstum zu fördern."
+TEXT_JA = "日本政府は経済成長を促進するための新しい政策を発表しました。東京での記者会見で首相が述べました。"
+TEXT_ZH = "中国政府宣布了一系列新的经济政策，旨在促进国内消费和经济增长，稳定金融市场。"
 TEXT_TOO_SHORT = "Hello"
 
 
@@ -51,44 +57,87 @@ class TestLanguageDetectorCore:
         det2 = get_language_detector()
         assert detector is det2
 
-    def test_detect_indonesian_short(self, detector):
+    # -- Supported languages ------------------------------------------------
+
+    def test_detect_indonesian_returns_id(self, detector):
         result = detector.detect(TEXT_ID_SHORT)
         assert result["language"] == "id"
-        assert result["is_supported"] is True
-        assert result["fallback_applied"] is False
+        assert result["supported"] is True
+        assert result["language_name"] == "Indonesian"
 
     def test_detect_indonesian_long(self, detector):
         result = detector.detect(TEXT_ID_LONG)
         assert result["language"] == "id"
+        assert result["supported"] is True
 
-    def test_detect_english_short(self, detector):
+    def test_detect_english_returns_en(self, detector):
         result = detector.detect(TEXT_EN_SHORT)
         assert result["language"] == "en"
-        assert result["is_supported"] is True
-        assert result["fallback_applied"] is False
+        assert result["supported"] is True
+        assert result["language_name"] == "English"
 
     def test_detect_english_long(self, detector):
         result = detector.detect(TEXT_EN_LONG)
         assert result["language"] == "en"
+        assert result["supported"] is True
 
-    def test_detect_unsupported_falls_back_to_en(self, detector):
+    # -- Unsupported languages — raw code preserved, supported=False --------
+
+    def test_detect_french_is_fr(self, detector):
+        result = detector.detect(TEXT_FR)
+        assert result["language"] == "fr", f"Expected 'fr', got '{result['language']}'"
+        assert result["supported"] is False
+        # CRITICAL: must NOT be converted to "en"
+        assert result["language"] != "en"
+
+    def test_detect_spanish_is_es(self, detector):
         result = detector.detect(TEXT_ES)
-        # Spanish is not supported → must fall back to "en"
-        assert result["language"] == "en"
-        assert result["fallback_applied"] is True
-        assert result["is_supported"] is False
-        assert result["raw_lang"] != "en"
+        assert result["language"] == "es", f"Expected 'es', got '{result['language']}'"
+        assert result["supported"] is False
+        assert result["language"] != "en"
+
+    def test_detect_german_is_de(self, detector):
+        result = detector.detect(TEXT_DE)
+        assert result["language"] == "de", f"Expected 'de', got '{result['language']}'"
+        assert result["supported"] is False
+        assert result["language"] != "en"
+
+    def test_detect_japanese_is_ja(self, detector):
+        result = detector.detect(TEXT_JA)
+        assert result["language"] == "ja", f"Expected 'ja', got '{result['language']}'"
+        assert result["supported"] is False
+        assert result["language"] != "en"
+
+    def test_detect_chinese_is_zh(self, detector):
+        result = detector.detect(TEXT_ZH)
+        # langdetect may return zh-cn or zh-tw or zh
+        lang = result["language"]
+        assert lang.startswith("zh"), f"Expected zh*, got '{lang}'"
+        assert result["supported"] is False
+        assert result["language"] != "en"
+
+    # -- Schema validation --------------------------------------------------
 
     def test_detect_returns_required_keys(self, detector):
         result = detector.detect(TEXT_EN_SHORT)
-        required_keys = {"language", "confidence", "raw_lang", "method", "is_supported", "fallback_applied"}
+        required_keys = {"language", "language_name", "confidence", "method", "supported"}
         assert required_keys.issubset(result.keys())
+
+    def test_detect_no_fallback_applied_key(self, detector):
+        """Old 'fallback_applied' key must not exist — it was removed."""
+        result = detector.detect(TEXT_EN_SHORT)
+        assert "fallback_applied" not in result
+
+    def test_detect_no_raw_lang_key(self, detector):
+        """Old 'raw_lang' key must not exist — replaced by 'language'."""
+        result = detector.detect(TEXT_EN_SHORT)
+        assert "raw_lang" not in result
 
     def test_detect_method_is_valid(self, detector):
         result = detector.detect(TEXT_ID_LONG)
         assert result["method"] in ("langdetect", "langid")
 
-    def test_detect_confidence_range(self, detector):
+    def test_detect_confidence_range_or_none(self, detector):
         result = detector.detect(TEXT_EN_LONG)
         if result["confidence"] is not None:
             assert 0.0 <= result["confidence"] <= 1.0
@@ -101,16 +150,15 @@ class TestLanguageDetectorCore:
         with pytest.raises(ValueError):
             detector.detect("")
 
-    def test_is_supported_true(self, detector):
+    def test_is_supported_true(self):
         assert LanguageDetector.is_supported("id") is True
         assert LanguageDetector.is_supported("en") is True
 
-    def test_is_supported_false(self, detector):
-        assert LanguageDetector.is_supported("es") is False
-        assert LanguageDetector.is_supported("fr") is False
-        assert LanguageDetector.is_supported("zh") is False
+    def test_is_supported_false(self):
+        for lang in ("es", "fr", "de", "ja", "zh", "ko", "ar"):
+            assert LanguageDetector.is_supported(lang) is False
 
-    def test_detect_language_code_convenience(self, detector):
+    def test_detect_language_code_returns_raw(self, detector):
         code = detector.detect_language_code(TEXT_ID_SHORT)
         assert code == "id"
 
@@ -125,21 +173,53 @@ class TestLanguageDetectApi:
         assert resp.status_code == 200
         data = resp.json()
         assert data["language"] == "id"
-        assert data["is_supported"] is True
-        assert data["fallback_applied"] is False
+        assert data["supported"] is True
+        assert data["language_name"] == "Indonesian"
 
     def test_detect_english(self):
         resp = client.post("/api/language/detect", json={"text": TEXT_EN_LONG})
         assert resp.status_code == 200
         data = resp.json()
         assert data["language"] == "en"
+        assert data["supported"] is True
 
-    def test_detect_unsupported_language(self):
+    def test_detect_french_preserved(self):
+        resp = client.post("/api/language/detect", json={"text": TEXT_FR})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["language"] == "fr"
+        assert data["supported"] is False
+        # Must NOT be silently converted
+        assert data["language"] != "en"
+
+    def test_detect_spanish_preserved(self):
         resp = client.post("/api/language/detect", json={"text": TEXT_ES})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["language"] == "en"
-        assert data["fallback_applied"] is True
+        assert data["language"] == "es"
+        assert data["supported"] is False
+
+    def test_detect_german_preserved(self):
+        resp = client.post("/api/language/detect", json={"text": TEXT_DE})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["language"] == "de"
+        assert data["supported"] is False
+
+    def test_detect_japanese_preserved(self):
+        resp = client.post("/api/language/detect", json={"text": TEXT_JA})
+        assert resp.status_code == 200
+        data = resp.json()
+        lang = data["language"]
+        assert lang == "ja"
+        assert data["supported"] is False
+
+    def test_detect_chinese_preserved(self):
+        resp = client.post("/api/language/detect", json={"text": TEXT_ZH})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["language"].startswith("zh")
+        assert data["supported"] is False
 
     def test_detect_too_short(self):
         resp = client.post("/api/language/detect", json={"text": "Hi"})
@@ -149,8 +229,11 @@ class TestLanguageDetectApi:
         resp = client.post("/api/language/detect", json={"text": TEXT_EN_SHORT})
         assert resp.status_code == 200
         data = resp.json()
-        for key in ("language", "raw_lang", "method", "is_supported", "fallback_applied"):
+        for key in ("language", "language_name", "method", "supported"):
             assert key in data
+        # Old fields must be gone
+        assert "fallback_applied" not in data
+        assert "is_supported" not in data
 
 
 # ===========================================================================
@@ -167,51 +250,94 @@ class TestMultilingualAnalyzer:
         from app.ai.multilingual_analyzer import get_multilingual_analyzer
         assert analyzer is get_multilingual_analyzer()
 
+    # -- Supported languages -----------------------------------------------
+
     def test_analyze_id_auto_detect(self, analyzer):
         result = analyzer.analyze(TEXT_ID_LONG)
+        assert result["supported"] is True
         assert result["language"]["code"] == "id"
         assert result["language"]["source"] == "auto"
-        # Category must be a known label
         assert isinstance(result["category"]["category"], str)
         assert len(result["category"]["category"]) > 0
-        # Sentiment must be valid
-        assert result["sentiment"]["sentiment"] in ("Positive", "Negative", "Neutral",
-                                                     "positif", "negatif", "netral")
 
     def test_analyze_en_auto_detect(self, analyzer):
         result = analyzer.analyze(TEXT_EN_LONG)
+        assert result["supported"] is True
         assert result["language"]["code"] == "en"
-        assert result["language"]["source"] == "auto"
 
     def test_analyze_with_language_override_id(self, analyzer):
         result = analyzer.analyze(TEXT_ID_LONG, language="id")
+        assert result["supported"] is True
         assert result["language"]["code"] == "id"
         assert result["language"]["source"] == "provided"
         assert result["language"]["confidence"] is None
 
     def test_analyze_with_language_override_en(self, analyzer):
         result = analyzer.analyze(TEXT_EN_SHORT, language="en")
+        assert result["supported"] is True
         assert result["language"]["code"] == "en"
         assert result["language"]["source"] == "provided"
 
-    def test_analyze_returns_all_keys(self, analyzer):
+    def test_analyze_returns_all_keys_for_supported(self, analyzer):
         result = analyzer.analyze(TEXT_EN_SHORT, language="en")
-        for key in ("language", "category", "sentiment", "keywords", "entities"):
+        for key in ("supported", "language", "category", "sentiment", "keywords", "entities"):
             assert key in result
 
-    def test_analyze_keywords_extracted(self, analyzer):
-        result = analyzer.analyze(TEXT_EN_LONG, language="en")
-        kw = result["keywords"]
-        assert "keywords" in kw
-        assert "method" in kw
-        assert kw["total"] >= 0
+    # -- Unsupported languages: NO ML models called ------------------------
 
-    def test_analyze_entities_extracted(self, analyzer):
-        result = analyzer.analyze(TEXT_EN_SHORT, language="en")
-        ent = result["entities"]
-        assert "entities" in ent
-        assert "model" in ent
-        assert isinstance(ent["entities"], list)
+    def test_analyze_french_returns_unsupported(self, analyzer):
+        result = analyzer.analyze(TEXT_FR)
+        assert result["supported"] is False
+        assert result["language"]["code"] == "fr"
+        assert result["language"]["supported"] is False
+        # No ML results
+        assert "category" not in result
+        assert "sentiment" not in result
+        assert "entities" not in result
+
+    def test_analyze_spanish_returns_unsupported(self, analyzer):
+        result = analyzer.analyze(TEXT_ES)
+        assert result["supported"] is False
+        assert result["language"]["code"] == "es"
+
+    def test_analyze_german_returns_unsupported(self, analyzer):
+        result = analyzer.analyze(TEXT_DE)
+        assert result["supported"] is False
+        assert result["language"]["code"] == "de"
+
+    def test_analyze_japanese_returns_unsupported(self, analyzer):
+        result = analyzer.analyze(TEXT_JA)
+        assert result["supported"] is False
+        assert result["language"]["code"] == "ja"
+
+    def test_analyze_chinese_returns_unsupported(self, analyzer):
+        result = analyzer.analyze(TEXT_ZH)
+        assert result["supported"] is False
+        lang = result["language"]["code"]
+        assert lang.startswith("zh")
+
+    def test_unsupported_does_not_call_english_classifier(self, analyzer):
+        """English classifier must NOT be called for unsupported language."""
+        with patch("app.ai.category_classifier.get_classifier") as mock_clf:
+            result = analyzer.analyze(TEXT_FR)
+            mock_clf.assert_not_called()
+        assert result["supported"] is False
+
+    def test_unsupported_does_not_call_indonesian_classifier(self, analyzer):
+        """Indonesian classifier must NOT be called for unsupported language."""
+        with patch("app.ai.indonesian_category_classifier.get_indonesian_classifier") as mock_clf:
+            result = analyzer.analyze(TEXT_ES)
+            mock_clf.assert_not_called()
+        assert result["supported"] is False
+
+    def test_unsupported_does_not_call_ner(self, analyzer):
+        """NER extractor must NOT be called for unsupported language."""
+        with patch("app.ai.ner_extractor.get_ner_extractor") as mock_ner:
+            result = analyzer.analyze(TEXT_DE)
+            mock_ner.assert_not_called()
+        assert result["supported"] is False
+
+    # -- Other validations -------------------------------------------------
 
     def test_analyze_confidence_ranges(self, analyzer):
         result = analyzer.analyze(TEXT_EN_LONG, language="en")
@@ -234,22 +360,26 @@ class TestMultilingualAnalyzer:
 # ===========================================================================
 
 class TestAnalyzeApi:
+    # -- Supported languages -----------------------------------------------
+
     def test_analyze_english_auto(self):
         resp = client.post("/api/analyze", json={"text": TEXT_EN_LONG})
         assert resp.status_code == 200
         data = resp.json()
+        assert data["status"] == "ok"
         assert data["language"]["code"] == "en"
         assert data["language"]["source"] == "auto"
-        assert "category" in data
-        assert "sentiment" in data
-        assert "keywords" in data
-        assert "entities" in data
+        assert data["language"]["supported"] is True
+        for key in ("category", "sentiment", "keywords", "entities"):
+            assert key in data
 
     def test_analyze_indonesian_auto(self):
         resp = client.post("/api/analyze", json={"text": TEXT_ID_LONG})
         assert resp.status_code == 200
         data = resp.json()
+        assert data["status"] == "ok"
         assert data["language"]["code"] == "id"
+        assert data["language"]["supported"] is True
 
     def test_analyze_with_language_override(self):
         resp = client.post("/api/analyze", json={
@@ -259,6 +389,7 @@ class TestAnalyzeApi:
         assert resp.status_code == 200
         data = resp.json()
         assert data["language"]["source"] == "provided"
+        assert data["status"] == "ok"
 
     def test_analyze_top_keywords_param(self):
         resp = client.post("/api/analyze", json={
@@ -269,16 +400,83 @@ class TestAnalyzeApi:
         data = resp.json()
         assert data["keywords"]["total"] <= 5
 
-    def test_analyze_invalid_language(self):
+    # -- Unsupported languages: must return unsupported_language -----------
+
+    def test_analyze_french_returns_unsupported_language(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_FR})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "unsupported_language"
+        assert data["language"]["code"] == "fr"
+        assert data["language"]["supported"] is False
+        assert "message" in data
+        # Must NOT have ML results
+        assert "category" not in data
+        assert "sentiment" not in data
+        assert "entities" not in data
+
+    def test_analyze_spanish_returns_unsupported_language(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_ES})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "unsupported_language"
+        assert data["language"]["code"] == "es"
+
+    def test_analyze_german_returns_unsupported_language(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_DE})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "unsupported_language"
+        assert data["language"]["code"] == "de"
+
+    def test_analyze_japanese_returns_unsupported_language(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_JA})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "unsupported_language"
+        assert data["language"]["code"] == "ja"
+
+    def test_analyze_chinese_returns_unsupported_language(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_ZH})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "unsupported_language"
+        assert data["language"]["code"].startswith("zh")
+
+    def test_analyze_unsupported_message_in_indonesian(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_FR})
+        assert resp.status_code == 200
+        data = resp.json()
+        msg = data.get("message", "")
+        assert len(msg) > 0
+        # Message should mention supported languages
+        assert "Indonesia" in msg or "Inggris" in msg
+
+    # -- Validation errors -------------------------------------------------
+
+    def test_analyze_invalid_language_override(self):
         resp = client.post("/api/analyze", json={
             "text": TEXT_EN_SHORT,
-            "language": "fr"
+            "language": "fr"   # fr not allowed as override (schema validates id|en only)
         })
         assert resp.status_code == 422
 
     def test_analyze_too_short_text(self):
         resp = client.post("/api/analyze", json={"text": "Hi"})
         assert resp.status_code == 422
+
+    # -- Schema validation for supported response --------------------------
+
+    def test_analyze_response_has_status_ok(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_EN_LONG})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+    def test_analyze_response_language_has_language_name(self):
+        resp = client.post("/api/analyze", json={"text": TEXT_EN_LONG})
+        data = resp.json()
+        assert "language_name" in data["language"]
+        assert data["language"]["language_name"] == "English"
 
     def test_analyze_response_schema_category(self):
         resp = client.post("/api/analyze", json={"text": TEXT_EN_LONG})

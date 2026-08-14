@@ -1,20 +1,30 @@
 """
-Multilingual Analyzer — Phase 4C
+Multilingual Analyzer — Phase 4C (Patched: Fix Unsupported Language Routing)
 
 Orchestrates all AI pipelines in a single call, routing to the correct
 language-specific model based on auto-detected or provided language.
 
+CRITICAL:
+    Unsupported languages (anything other than "id" or "en") MUST NOT be
+    routed to any ML model. analyze() returns an unsupported-language result
+    with supported=False so the route layer can return the correct response.
+
 Supported routing:
-    "id" → IndonesianCategoryClassifier + IndonesianSentimentClassifier
-    "en" → CategoryClassifier           + SentimentClassifier
+    "id" → IndonesianCategoryClassifier + IndonesianSentimentClassifier + Indonesian NER
+    "en" → CategoryClassifier           + SentimentClassifier           + English NER
     Both → KeywordExtractor (language-agnostic)
-    Both → NERExtractor (language-aware, id/en)
+
+Unsupported (any other lang):
+    → No category, no sentiment, no NER
+    → Returns {"supported": False, "language": {...}}
 """
 
 import logging
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+_SUPPORTED_LANGS = {"id", "en"}
 
 
 class MultilingualAnalyzer:
@@ -24,6 +34,7 @@ class MultilingualAnalyzer:
     - Accepts optional `language` override; auto-detects if None.
     - Lazy-loads models only when first called for that language.
     - Thread-safe (all underlying models use read-only inference).
+    - Unsupported languages are NEVER routed to English or Indonesian models.
     """
 
     def analyze(
@@ -41,18 +52,32 @@ class MultilingualAnalyzer:
                           If None, language is auto-detected.
             top_keywords: Max keywords to extract (1–20).
 
-        Returns:
+        Returns (supported language):
             {
+                "supported": True,
                 "language": {
                     "code": "id",
-                    "source": "auto" | "provided",
-                    "confidence": 0.99 | None,
-                    "raw_detected": "id" | None,
+                    "language_name": "Indonesian",
+                    "source": "auto"|"provided",
+                    "confidence": 0.99|None,
+                    "supported": True,
                 },
-                "category": {"category": ..., "confidence": ..., "all_scores": ...},
-                "sentiment": {"sentiment": ..., "confidence": ..., "all_scores": ...},
-                "keywords": {"keywords": [...], "method": ..., "total": ...},
-                "entities": {"entities": [...], "model": ...},
+                "category":  {...},
+                "sentiment": {...},
+                "keywords":  {...},
+                "entities":  {...},
+            }
+
+        Returns (unsupported language):
+            {
+                "supported": False,
+                "language": {
+                    "code": "fr",
+                    "language_name": "French",
+                    "source": "auto",
+                    "confidence": 0.99,
+                    "supported": False,
+                },
             }
         """
         if not text or not isinstance(text, str):
@@ -65,29 +90,40 @@ class MultilingualAnalyzer:
         # 1. Language resolution
         # ------------------------------------------------------------------
         lang_info = self._resolve_language(text, language)
+
+        # ------------------------------------------------------------------
+        # 2. Gate: if language not supported, stop here — run NO models
+        # ------------------------------------------------------------------
+        if not lang_info["supported"]:
+            return {
+                "supported": False,
+                "language": lang_info,
+            }
+
         lang_code = lang_info["code"]
 
         # ------------------------------------------------------------------
-        # 2. Category classification
+        # 3. Category classification
         # ------------------------------------------------------------------
         category_result = self._classify_category(text, lang_code)
 
         # ------------------------------------------------------------------
-        # 3. Sentiment analysis
+        # 4. Sentiment analysis
         # ------------------------------------------------------------------
         sentiment_result = self._classify_sentiment(text, lang_code)
 
         # ------------------------------------------------------------------
-        # 4. Keyword extraction (language-agnostic)
+        # 5. Keyword extraction (language-agnostic)
         # ------------------------------------------------------------------
         keyword_result = self._extract_keywords(text, top_keywords)
 
         # ------------------------------------------------------------------
-        # 5. Named Entity Recognition
+        # 6. Named Entity Recognition
         # ------------------------------------------------------------------
         entity_result = self._extract_entities(text, lang_code)
 
         return {
+            "supported": True,
             "language": lang_info,
             "category": category_result,
             "sentiment": sentiment_result,
@@ -99,38 +135,44 @@ class MultilingualAnalyzer:
 
     def _resolve_language(self, text: str, language: str | None) -> dict:
         """Resolve the language to use — auto-detect or use provided value."""
+        from app.ai.language_detector import get_language_detector, _LANGUAGE_NAMES
+
         if language is not None:
+            # Caller-provided; always treated as supported (schema validates "id"|"en")
             return {
                 "code": language,
+                "language_name": _LANGUAGE_NAMES.get(language, language.upper()),
                 "source": "provided",
                 "confidence": None,
-                "raw_detected": None,
+                "supported": True,
             }
 
-        from app.ai.language_detector import get_language_detector
         detector = get_language_detector()
 
         try:
             detection = detector.detect(text)
             return {
                 "code": detection["language"],
+                "language_name": detection["language_name"],
                 "source": "auto",
                 "confidence": detection["confidence"],
-                "raw_detected": detection["raw_lang"],
+                "supported": detection["supported"],
             }
         except Exception as exc:
             logger.warning(
-                "Language detection failed (%s), defaulting to 'en'", exc
+                "Language detection failed (%s), treating as unsupported", exc
             )
+            # Detection failure → treat as unsupported, don't silently default to "en"
             return {
-                "code": "en",
+                "code": "unknown",
+                "language_name": "Unknown",
                 "source": "auto",
                 "confidence": None,
-                "raw_detected": None,
+                "supported": False,
             }
 
     def _classify_category(self, text: str, lang: str) -> dict:
-        """Route to the correct category classifier."""
+        """Route to the correct category classifier (only "id" or "en")."""
         try:
             if lang == "id":
                 from app.ai.indonesian_category_classifier import get_indonesian_classifier
@@ -144,7 +186,7 @@ class MultilingualAnalyzer:
             return {"category": "Unknown", "confidence": 0.0, "all_scores": {}}
 
     def _classify_sentiment(self, text: str, lang: str) -> dict:
-        """Route to the correct sentiment classifier."""
+        """Route to the correct sentiment classifier (only "id" or "en")."""
         try:
             if lang == "id":
                 from app.ai.sentiment_id_classifier import get_indonesian_sentiment_classifier
@@ -173,7 +215,7 @@ class MultilingualAnalyzer:
             return {"keywords": [], "method": "error", "total": 0}
 
     def _extract_entities(self, text: str, lang: str) -> dict:
-        """Extract named entities for the given language."""
+        """Extract named entities (only "id" or "en")."""
         try:
             from app.ai.ner_extractor import get_ner_extractor
             extractor = get_ner_extractor()

@@ -1,15 +1,15 @@
 """
-Language Detector — Phase 4C
+Language Detector — Phase 4C (Patched: Fix Unsupported Language Routing)
 
-Automatically detects the language of a given text and routes to the correct
-ML pipeline (Indonesian or English).
+Automatically detects the language of a given text.
 
 Strategy:
     langdetect (primary) — probabilistic, seeded for reproducibility
     langid    (fallback)  — rule-based, more robust on short texts
 
-Supported output languages: "id", "en"
-Any other detected language falls back to "en".
+Supported pipeline languages: "id", "en"
+Unsupported languages are returned as-is with supported=False.
+They are NEVER silently converted to "en".
 """
 
 import logging
@@ -20,9 +20,70 @@ logger = logging.getLogger(__name__)
 
 # Minimum text length for reliable detection
 _MIN_CHARS = 20
-# Supported language codes (maps detected lang → normalised lang)
+
+# Languages the AI pipeline can handle
 _SUPPORTED = {"id", "en"}
-_DEFAULT_LANG = "en"
+
+# Human-readable names for ISO 639-1 codes (common subset)
+_LANGUAGE_NAMES: dict[str, str] = {
+    "id": "Indonesian",
+    "en": "English",
+    "af": "Afrikaans",
+    "ar": "Arabic",
+    "bg": "Bulgarian",
+    "bn": "Bengali",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "cy": "Welsh",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "es": "Spanish",
+    "et": "Estonian",
+    "fa": "Persian",
+    "fi": "Finnish",
+    "fr": "French",
+    "gu": "Gujarati",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hr": "Croatian",
+    "hu": "Hungarian",
+    "hy": "Armenian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ka": "Georgian",
+    "kn": "Kannada",
+    "ko": "Korean",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "mk": "Macedonian",
+    "ml": "Malayalam",
+    "mr": "Marathi",
+    "ms": "Malay",
+    "nl": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "so": "Somali",
+    "sq": "Albanian",
+    "sv": "Swedish",
+    "sw": "Swahili",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "th": "Thai",
+    "tl": "Filipino",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "ur": "Urdu",
+    "vi": "Vietnamese",
+    "zh-cn": "Chinese (Simplified)",
+    "zh-tw": "Chinese (Traditional)",
+    "zh": "Chinese",
+}
 
 # langdetect uses global state; protect with a lock for thread safety
 _langdetect_lock = threading.Lock()
@@ -38,6 +99,9 @@ class LanguageDetector:
 
     Lazy-initialises both langdetect and langid on first use.
     Thread-safe for concurrent read inference.
+
+    IMPORTANT: Unsupported languages are returned with supported=False.
+    They are NEVER silently converted or routed to English models.
     """
 
     def __init__(self) -> None:
@@ -54,9 +118,9 @@ class LanguageDetector:
         from langdetect import DetectorFactory
         DetectorFactory.seed = 0
 
-        # Pre-load langid classifier (it loads a large model file on import)
+        # Pre-load langid classifier
         import langid
-        langid.set_languages(None)  # no filter — accept all
+        langid.set_languages(None)  # no filter — accept all languages
         self._langid_model = langid
 
         self._initialised = True
@@ -73,13 +137,15 @@ class LanguageDetector:
 
         Returns:
             {
-                "language":          "id" | "en"   – normalised, always supported,
-                "confidence":        float | None   – 0.0–1.0 (langdetect) or None,
-                "raw_lang":          str            – raw ISO code from the detector,
-                "method":            str            – "langdetect" | "langid",
-                "is_supported":      bool,          – True if raw_lang in {"id","en"},
-                "fallback_applied":  bool,          – True when mapped to default "en",
+                "language":      str        – raw ISO code (e.g. "fr", "id", "en"),
+                "language_name": str        – human-readable name (e.g. "French"),
+                "confidence":    float|None – 0.0–1.0 from langdetect, or None,
+                "method":        str        – "langdetect" or "langid",
+                "supported":     bool       – True only if language in {"id", "en"},
             }
+
+        NOTE: "language" is ALWAYS the raw detected code. Unsupported languages
+        are returned as-is with supported=False. They are never mapped to "en".
         """
         self._init()
 
@@ -114,28 +180,30 @@ class LanguageDetector:
                     "Could not detect language from the provided text."
                 ) from exc
 
-        # -- Normalise --------------------------------------------------
-        is_supported = raw_lang in _SUPPORTED
-        fallback_applied = not is_supported
-        normalised = raw_lang if is_supported else _DEFAULT_LANG
+        supported = raw_lang in _SUPPORTED
+        language_name = _LANGUAGE_NAMES.get(raw_lang, raw_lang.upper())
 
         return {
-            "language": normalised,
+            "language": raw_lang,
+            "language_name": language_name,
             "confidence": round(confidence, 4) if confidence is not None else None,
-            "raw_lang": raw_lang,
             "method": method,
-            "is_supported": is_supported,
-            "fallback_applied": fallback_applied,
+            "supported": supported,
         }
 
     def detect_language_code(self, text: str) -> str:
-        """Convenience method — returns just the normalised language code."""
+        """Convenience method — returns the raw detected language code."""
         return self.detect(text)["language"]
 
     @staticmethod
     def is_supported(lang: str) -> bool:
         """Return True if *lang* is a supported language code."""
         return lang in _SUPPORTED
+
+    @staticmethod
+    def get_language_name(lang: str) -> str:
+        """Return human-readable name for a language code."""
+        return _LANGUAGE_NAMES.get(lang, lang.upper())
 
     # ── Internal helpers ──────────────────────────────────────────────
 
@@ -152,11 +220,13 @@ class LanguageDetector:
         top = results[0]
         return top.lang, float(top.prob)
 
-    def _detect_langid(self, text: str) -> tuple[str, float | None]:
-        """Run langid and return (lang_code, confidence)."""
-        lang, score = self._langid_model.classify(text)
-        # langid score is a log-probability — convert to a pseudo-confidence
-        # by using None (we don't fake a probability range)
+    def _detect_langid(self, text: str) -> tuple[str, None]:
+        """Run langid and return (lang_code, None).
+
+        langid returns a log-probability score — we do NOT convert it to a
+        pseudo-confidence to avoid fabricating data.
+        """
+        lang, _score = self._langid_model.classify(text)
         return lang, None
 
 

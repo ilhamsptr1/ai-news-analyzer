@@ -1,5 +1,5 @@
 """
-Full Analysis Route — Phase 4C.
+Full Analysis Route — Phase 4C (Patched: Fix Unsupported Language Routing).
 
 Endpoints:
     POST /api/analyze
@@ -8,6 +8,7 @@ Endpoints:
 import logging
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from app.ai.multilingual_analyzer import get_multilingual_analyzer
 from app.schemas.analyze import (
@@ -19,32 +20,39 @@ from app.schemas.analyze import (
     KeywordsInfo,
     LanguageInfo,
     SentimentResult,
+    UnsupportedLanguageResponse,
 )
 from app.schemas.entity import EntityItem
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Analysis"])
 
+_UNSUPPORTED_MSG = (
+    "Bahasa artikel tidak didukung. "
+    "Saat ini AI News Analyzer mendukung Bahasa Indonesia (id) dan Bahasa Inggris (en)."
+)
+
 
 @router.post(
     "/analyze",
-    response_model=AnalyzeResponse,
-    status_code=status.HTTP_200_OK,
     summary="Full Article Analysis",
     description=(
-        "Run the complete NLP analysis pipeline on a text: "
-        "auto-detects language, then performs category classification, "
-        "sentiment analysis, keyword extraction, and named entity recognition. "
-        "Optionally pass `language` to skip auto-detection."
+        "Run the complete NLP analysis pipeline on a text. "
+        "Language is auto-detected; pass `language` to override. "
+        "If the language is not supported ('id' or 'en'), "
+        "returns status='unsupported_language' and does NOT run ML models."
     ),
 )
-def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+def analyze(request: AnalyzeRequest):
     """
     Full NLP pipeline for a news article.
 
     - **text**: Article text (min 10 chars, max 500,000 chars).
     - **language**: Optional override ('id' or 'en'). Auto-detected if omitted.
     - **top_keywords**: Number of keywords to extract (default 10).
+
+    Returns `AnalyzeResponse` for supported languages,
+    or `UnsupportedLanguageResponse` for unsupported ones.
     """
     analyzer = get_multilingual_analyzer()
 
@@ -66,20 +74,36 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
             detail="Analysis failed. Please try again.",
         )
 
-    # -- Build structured response ----------------------------------------
     lang_data = result["language"]
+    lang_info = LanguageInfo(
+        code=lang_data["code"],
+        language_name=lang_data.get("language_name", lang_data["code"].upper()),
+        source=lang_data["source"],
+        confidence=lang_data.get("confidence"),
+        supported=lang_data["supported"],
+    )
+
+    # -- Unsupported language: return early, NO ML results ----------------
+    if not result["supported"]:
+        resp = UnsupportedLanguageResponse(
+            status="unsupported_language",
+            language=lang_info,
+            message=_UNSUPPORTED_MSG,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=resp.model_dump(),
+        )
+
+    # -- Supported language: return full analysis -------------------------
     cat_data = result["category"]
     sent_data = result["sentiment"]
     kw_data = result["keywords"]
     ent_data = result["entities"]
 
     return AnalyzeResponse(
-        language=LanguageInfo(
-            code=lang_data["code"],
-            source=lang_data["source"],
-            confidence=lang_data.get("confidence"),
-            raw_detected=lang_data.get("raw_detected"),
-        ),
+        status="ok",
+        language=lang_info,
         category=CategoryResult(
             category=cat_data.get("category", "Unknown"),
             confidence=cat_data.get("confidence", 0.0),

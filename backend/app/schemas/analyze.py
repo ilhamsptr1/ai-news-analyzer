@@ -1,5 +1,5 @@
 """
-Pydantic schemas for the Full Analysis API — Phase 4C.
+Pydantic schemas for the Full Analysis API — Phase 4C (Patched).
 """
 
 from pydantic import BaseModel, Field
@@ -36,14 +36,15 @@ class AnalyzeRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Response sub-objects
+# Response sub-objects — Supported languages
 # ---------------------------------------------------------------------------
 
 class LanguageInfo(BaseModel):
-    code: str = Field(..., description="Language code: 'id' or 'en'.")
+    code: str = Field(..., description="Detected language code (e.g. 'id', 'en', 'fr').")
+    language_name: str = Field(..., description="Human-readable language name.")
     source: str = Field(..., description="'auto' if auto-detected, 'provided' if passed by caller.")
-    confidence: float | None = Field(None, description="Detection confidence (0–1) or null if provided.")
-    raw_detected: str | None = Field(None, description="Raw ISO code from detector, or null if language was provided.")
+    confidence: float | None = Field(None, description="Detection confidence (0–1), or null.")
+    supported: bool = Field(..., description="True if language is supported by the AI pipeline.")
 
 
 class CategoryResult(BaseModel):
@@ -75,13 +76,34 @@ class EntitiesInfo(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Full response
+# Full response — supported language
 # ---------------------------------------------------------------------------
 
 class AnalyzeResponse(BaseModel):
-    """Full analysis response containing all NLP pipeline results."""
+    """Full analysis response (returned when language IS supported)."""
+    status: str = Field(default="ok", description="Always 'ok' for supported languages.")
     language: LanguageInfo
     category: CategoryResult
     sentiment: SentimentResult
     keywords: KeywordsInfo
     entities: EntitiesInfo
+
+
+# ---------------------------------------------------------------------------
+# Unsupported language response
+# ---------------------------------------------------------------------------
+
+class UnsupportedLanguageResponse(BaseModel):
+    """
+    Returned when the detected language is not supported by the AI pipeline.
+    No ML analysis is performed.
+    """
+    status: str = Field(
+        default="unsupported_language",
+        description="Always 'unsupported_language' for unsupported languages.",
+    )
+    language: LanguageInfo
+    message: str = Field(
+        ...,
+        description="Human-readable explanation in Bahasa Indonesia.",
+    )
