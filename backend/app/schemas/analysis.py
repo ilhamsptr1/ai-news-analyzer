@@ -102,3 +102,52 @@ class AnalysisResponse(BaseModel):
     # Relationships
     keywords: list[AnalysisKeywordResponse]
     entities: list[AnalysisEntityResponse]
+
+
+# ---------------------------------------------------------------------------
+# Schemas for History (Phase 5C-2)
+# ---------------------------------------------------------------------------
+
+class AnalysisListItem(BaseModel):
+    """Schema for returning a single item in the analysis history list (without full article content)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    article_id: int
+    created_at: datetime
+    
+    language_code: str | None
+    language_name: str | None
+    category: str | None
+    sentiment: str | None
+    sentiment_confidence: float | None
+    category_confidence: float | None
+    language_confidence: float | None
+
+    # Article metadata
+    article_title: str | None = Field(default=None)
+    article_source: str | None = Field(default=None)
+    article_published_at: datetime | None = Field(default=None)
+
+
+class AnalysisListResponse(BaseModel):
+    """Schema for returning a paginated list of analysis history."""
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+    limit: int
+    offset: int
+    items: list[AnalysisListItem]
+
+
+class AnalysisDetailResponse(BaseModel):
+    """Schema for returning the full detail of an analysis including the full article."""
+    model_config = ConfigDict(from_attributes=True)
+    
+    # Let's reuse AnalysisResponse but also include the full article details
+    # We will just embed it
+    analysis: AnalysisResponse
+    
+    # We'll use a dict or generic schema for the article to prevent circular imports if needed,
+    # but we can just import ArticleResponse locally in the router.
+    article: Any # Will be ArticleResponse from article.py

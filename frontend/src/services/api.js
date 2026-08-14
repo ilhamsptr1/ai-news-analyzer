@@ -70,4 +70,37 @@ export async function analyzeArticle(url, topKeywords = 10) {
   return post('/api/articles/analyze', { url, top_keywords: topKeywords });
 }
 
-export default { checkHealth, extractArticle, listArticles, analyzeArticle };
+/**
+ * Get analysis history list (Phase 5C-2)
+ * @param {Object} params - Query parameters (limit, offset, language, category, sentiment)
+ * @returns {Promise<AnalysisListResponse>}
+ */
+export async function getAnalysisHistory(params = {}) {
+  const queryParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, value);
+    }
+  }
+  const queryString = queryParams.toString();
+  const path = `/api/analyses${queryString ? '?' + queryString : ''}`;
+  return get(path);
+}
+
+/**
+ * Get full detail of an analysis (Phase 5C-2)
+ * @param {number|string} id - Analysis ID
+ * @returns {Promise<AnalysisDetailResponse>}
+ */
+export async function getAnalysisDetail(id) {
+  return get(`/api/analyses/${id}`);
+}
+
+export default { 
+  checkHealth, 
+  extractArticle, 
+  listArticles, 
+  analyzeArticle,
+  getAnalysisHistory,
+  getAnalysisDetail 
+};

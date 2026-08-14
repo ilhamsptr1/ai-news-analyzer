@@ -6,11 +6,13 @@
 import { useState } from 'react';
 import ArticleExtractor from './components/ArticleExtractor';
 import NewsAnalyzer from './components/NewsAnalyzer';
+import History from './components/History';
 import StatusBadge from './components/StatusBadge';
 
 const NAV_TABS = [
   { id: 'home',    label: '🏠 Home' },
   { id: 'analyze', label: '🤖 Analyze' },
+  { id: 'history', label: '📜 History' },
   { id: 'extract', label: '⚡ Extract' },
 ];
 
@@ -62,7 +64,7 @@ export default function App() {
             ))}
           </div>
 
-          <span className="navbar-phase-tag">Phase 5C — Full Pipeline</span>
+          <span className="navbar-phase-tag">Phase 5C-2 — History</span>
         </nav>
 
         {/* ── Main Content ── */}
@@ -140,6 +142,17 @@ export default function App() {
             </div>
           )}
 
+          {/* ── HISTORY TAB ── */}
+          {activeTab === 'history' && (
+            <div
+              className="extract-tab-content"
+              role="tabpanel"
+              aria-labelledby="tab-history"
+            >
+              <History />
+            </div>
+          )}
+
           {/* ── EXTRACT TAB ── */}
           {activeTab === 'extract' && (
             <div
@@ -155,7 +168,7 @@ export default function App() {
         {/* ── Footer ── */}
         <footer className="footer" role="contentinfo">
           <p>
-            AI News Analyzer — Phase 5C &middot; Built with{' '}
+            AI News Analyzer — Phase 5C-2 &middot; Built with{' '}
             <a href="https://fastapi.tiangolo.com/" target="_blank" rel="noopener noreferrer">
               FastAPI
             </a>{' '}
