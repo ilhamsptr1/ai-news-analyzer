@@ -28,7 +28,7 @@ function getErrorMessage(status, defaultDetail) {
 async function get(path) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Bypass-Tunnel-Reminder': 'true' },
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -42,7 +42,7 @@ async function get(path) {
 async function post(path, body) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Bypass-Tunnel-Reminder': 'true' },
     body: JSON.stringify(body),
   });
   
