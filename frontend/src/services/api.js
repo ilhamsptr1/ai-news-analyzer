@@ -3,7 +3,26 @@
  * All backend communication goes through this module.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
+/**
+ * Helper to map HTTP status codes to user-friendly Indonesian messages
+ */
+function getErrorMessage(status, defaultDetail) {
+  switch (status) {
+    case 400: return 'Permintaan tidak valid. Pastikan format data sudah benar.';
+    case 401: return 'Sesi telah habis. Silakan login kembali.';
+    case 403: return 'Akses ditolak. Website menolak akses otomatis.';
+    case 404: return 'Data atau halaman tidak ditemukan.';
+    case 409: return 'Data sudah ada (konflik).';
+    case 422: return 'Format konten tidak dapat diproses.';
+    case 429: return 'Terlalu banyak permintaan. Silakan coba lagi nanti.';
+    case 500: return 'Terjadi kesalahan internal pada server.';
+    case 502: return 'Website sumber tidak dapat dihubungi.';
+    case 504: return 'Website terlalu lama merespons.';
+    default: return defaultDetail || `Terjadi kesalahan (HTTP ${status}).`;
+  }
+}
 
 /** Generic GET request */
 async function get(path) {
@@ -13,7 +32,8 @@ async function get(path) {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw { status: response.status, detail: err.detail || `HTTP ${response.status}` };
+    const detail = getErrorMessage(response.status, err.detail);
+    throw { status: response.status, detail };
   }
   return response.json();
 }
@@ -25,11 +45,13 @@ async function post(path, body) {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await response.json().catch(() => ({}));
+  
   if (!response.ok) {
-    throw { status: response.status, detail: data.detail || `HTTP ${response.status}` };
+    const data = await response.json().catch(() => ({}));
+    const detail = getErrorMessage(response.status, data.detail);
+    throw { status: response.status, detail };
   }
-  return data;
+  return response.json();
 }
 
 /**
@@ -96,11 +118,20 @@ export async function getAnalysisDetail(id) {
   return get(`/api/analyses/${id}`);
 }
 
+/**
+ * Get dashboard analytics statistics (Phase 6)
+ * @returns {Promise<DashboardStats>}
+ */
+export async function getDashboardStats() {
+  return get('/api/dashboard/stats');
+}
+
 export default { 
   checkHealth, 
   extractArticle, 
   listArticles, 
   analyzeArticle,
   getAnalysisHistory,
-  getAnalysisDetail 
+  getAnalysisDetail,
+  getDashboardStats,
 };

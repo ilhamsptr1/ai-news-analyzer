@@ -106,7 +106,7 @@ function ArticleResult({ article }) {
 
       {/* Content */}
       <div className="article-content-area">
-        <h3 className="article-content-label">Article Content</h3>
+        <h3 className="article-content-label">Konten Mentah</h3>
         <div className="article-content-text" aria-live="polite">
           {displayContent.split('\n').map((para, i) =>
             para.trim() ? <p key={i}>{para.trim()}</p> : null
@@ -184,7 +184,8 @@ export default function ArticleExtractor() {
   }
 
   return (
-    <section className="extractor-section" aria-labelledby="extractor-heading">
+    <section className="extractor-container" aria-labelledby="extractor-heading">
+      <div className="extractor-card">
       {/* Section heading */}
       <div className="extractor-header">
         <div className="extractor-eyebrow">
@@ -192,11 +193,10 @@ export default function ArticleExtractor() {
           Phase 3 — Article Extraction
         </div>
         <h2 id="extractor-heading" className="extractor-title">
-          Analyze a News Article
+          Ekstrak Artikel
         </h2>
         <p className="extractor-subtitle">
-          Enter a public news article URL to extract and store its content.
-          AI analysis will be available in Phase 4.
+          Hanya ekstrak konten dari sebuah artikel berita. Analisis AI tidak akan dijalankan.
         </p>
       </div>
 
@@ -235,10 +235,10 @@ export default function ArticleExtractor() {
               {status === 'loading' ? (
                 <>
                   <span className="extractor-spinner" aria-hidden="true" />
-                  Extracting…
+                  Mengekstrak…
                 </>
               ) : (
-                '⚡ Extract Article'
+                'Ekstrak Konten'
               )}
             </button>
           </div>
@@ -296,10 +296,11 @@ export default function ArticleExtractor() {
             onClick={handleReset}
             aria-label="Extract another article"
           >
-            ＋ Extract Another Article
+            ← Ekstrak Artikel Lain
           </button>
         </>
       )}
+      </div>
     </section>
   );
 }

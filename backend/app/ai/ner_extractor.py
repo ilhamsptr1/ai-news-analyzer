@@ -66,13 +66,70 @@ class NERExtractor:
             text = text.strip()
             if len(text) <= 1:
                 return False
-            # Filter pure digits that are 4 characters or less (often Wikipedia noise like years or brackets)
-            if text.isdigit() and len(text) <= 4:
+
+            # 1. Filter out pure digits, no matter the length (e.g. years, pure numbers)
+            if text.replace(".", "").replace(",", "").isdigit():
                 return False
-            # Filter punctuation or whitespace only
+
+            # 2. Filter out punctuation or whitespace only
             if all(c in string.punctuation or c.isspace() for c in text):
                 return False
+
+            # 3. Filter currency/financial numbers/percentages
+            text_lower = text.lower()
+            if any(text_lower.startswith(prefix) for prefix in ["rp", "us$", "$", "€"]):
+                remainder = text_lower.replace("rp", "").replace("us$", "").replace("$", "").replace("€", "").strip()
+                if remainder.replace(".", "").replace(",", "").replace("triliun", "").replace("miliar", "").replace("juta", "").strip().isdigit():
+                    return False
+
+            if "persen" in text_lower or "%" in text:
+                remainder = text_lower.replace("persen", "").replace("%", "").strip()
+                if remainder.replace(".", "").replace(",", "").isdigit():
+                    return False
+
+            magnitude_remainder = text_lower.replace("triliun", "").replace("miliar", "").replace("juta", "").replace("ribu", "").strip()
+            if magnitude_remainder.replace(".", "").replace(",", "").isdigit():
+                return False
+
+            # 4. Require at least 2 actual alphabetic characters.
+            #    Filters BERT subword fragments like "koc", "Sh", "BP", "IK", "as",
+            #    "ing", "Rp", "PT" (when only 2 chars and all-caps below)
+            alpha_chars = [c for c in text if c.isalpha()]
+            if len(alpha_chars) < 2:
+                return False
+
+            # 5. Short all-lowercase tokens are almost always BERT subword noise.
+            #    Real named entities start with a capital or are well-known acronyms.
+            if len(text) <= 4 and text == text.lower() and text.isalpha():
+                return False
+
+            # 6. Filter known generic nouns that BERT occasionally misclassifies.
+            _GENERIC_NOUNS = {
+                # Indonesian
+                "ruang", "pelaksana", "presiden", "gubernur", "menteri", "direktur",
+                "kantor", "pusat", "area", "kawasan", "wilayah", "daerah", "kota",
+                "kabupaten", "provinsi", "negara", "jalan", "gedung", "lantai",
+                "salinan", "keluaran", "pejabat", "koordinator", "kepala",
+                # English
+                "retail", "street", "central", "walk", "center", "plaza", "office",
+                "building", "floor", "road", "avenue", "district", "region",
+            }
+            if text_lower in _GENERIC_NOUNS:
+                return False
+
             return True
+
+        def _map_label(label: str) -> str | None:
+            """Map labels to user-friendly names. Return None to drop the entity."""
+            label = label.upper()
+            if label in ("PERSON", "PER"):
+                return "PERSON"
+            elif label in ("ORG", "ORGANIZATION"):
+                return "ORGANIZATION"
+            elif label in ("GPE", "LOC", "LOCATION"):
+                return "LOCATION"
+            # Drop OTHER, MISC, EVT, PROD, etc. to reduce noise as requested
+            return None
 
         if language == "id":
             model = self._load_indonesian()
@@ -89,13 +146,15 @@ class NERExtractor:
                 label = ent["entity_group"]
                 
                 if _is_valid_entity(text_slice, label):
-                    entities.append({
-                        "text": text_slice,
-                        "label": label,
-                        "start": start_idx,
-                        "end": end_idx,
-                        "score": round(float(ent["score"]), 4),
-                    })
+                    mapped_label = _map_label(label)
+                    if mapped_label:
+                        entities.append({
+                            "text": text_slice,
+                            "label": mapped_label,
+                            "start": start_idx,
+                            "end": end_idx,
+                            "score": round(float(ent["score"]), 4),
+                        })
         else:
             model = self._load_english()
             model_name = "en_core_web_sm"
@@ -103,13 +162,15 @@ class NERExtractor:
             doc = model(text)
             for ent in doc.ents:
                 if _is_valid_entity(ent.text, ent.label_):
-                    entities.append({
-                        "text": ent.text,
-                        "label": ent.label_,
-                        "start": ent.start_char,
-                        "end": ent.end_char,
-                        "score": None,  # spaCy does not easily expose NER confidence out of the box
-                    })
+                    mapped_label = _map_label(ent.label_)
+                    if mapped_label:
+                        entities.append({
+                            "text": ent.text,
+                            "label": mapped_label,
+                            "start": ent.start_char,
+                            "end": ent.end_char,
+                            "score": None,  # spaCy does not easily expose NER confidence out of the box
+                        })
 
         # Deduplicate entities before returning
         unique_entities = self.get_unique_entities(entities)

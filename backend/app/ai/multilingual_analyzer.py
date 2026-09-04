@@ -40,6 +40,7 @@ class MultilingualAnalyzer:
     def analyze(
         self,
         text: str,
+        title: str | None = None,
         language: str | None = None,
         top_keywords: int = 10,
     ) -> dict:
@@ -122,6 +123,16 @@ class MultilingualAnalyzer:
         # ------------------------------------------------------------------
         entity_result = self._extract_entities(text, lang_code)
 
+        # ------------------------------------------------------------------
+        # 7. Clickbait Detection
+        # ------------------------------------------------------------------
+        clickbait_result = self._detect_clickbait(title, text, lang_code) if title else {"score": 0.0, "reasons": ["No title provided"]}
+
+        # ------------------------------------------------------------------
+        # 8. Objectivity Detection (Opini vs Fakta)
+        # ------------------------------------------------------------------
+        objectivity_result = self._detect_objectivity(text, lang_code)
+
         return {
             "supported": True,
             "language": lang_info,
@@ -129,6 +140,8 @@ class MultilingualAnalyzer:
             "sentiment": sentiment_result,
             "keywords": keyword_result,
             "entities": entity_result,
+            "clickbait": clickbait_result,
+            "objectivity": objectivity_result,
         }
 
     # ── Private helpers ───────────────────────────────────────────────
@@ -228,6 +241,28 @@ class MultilingualAnalyzer:
             logger.error("NER extraction error (%s): %s", lang, exc, exc_info=True)
             return {"entities": [], "model": "error"}
 
+
+    def _detect_clickbait(self, title: str, text: str, lang: str) -> dict:
+        """Extract clickbait score."""
+        try:
+            from app.ai.clickbait_detector import get_clickbait_detector
+            detector = get_clickbait_detector()
+            return detector.detect(title=title, text=text, lang=lang)
+        except Exception as exc:
+            logger.error("Clickbait detection error (%s): %s", lang, exc, exc_info=True)
+            return {"score": 0.0, "reasons": ["Error in detection"]}
+
+    def _detect_objectivity(self, text: str, lang: str) -> dict:
+        """Extract objectivity score (Fakta vs Opini)."""
+        try:
+            from app.ai.objectivity_detector import get_objectivity_detector
+            detector = get_objectivity_detector()
+            return detector.detect(text=text, lang=lang)
+        except Exception as exc:
+            logger.error("Objectivity detection error (%s): %s", lang, exc, exc_info=True)
+            return {"score": 0.5, "details": {"reason": "Error in detection"}}
+
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Singleton

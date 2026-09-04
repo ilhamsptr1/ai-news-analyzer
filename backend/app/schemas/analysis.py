@@ -53,6 +53,9 @@ class AnalysisCreate(BaseModel):
     category_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     sentiment: str | None = None
     sentiment_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    clickbait_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    objectivity_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    objectivity_details: dict[str, Any] | None = None
     
     # Legacy fields mapping
     summary: str | None = None
@@ -86,7 +89,9 @@ class AnalysisResponse(BaseModel):
     category_confidence: float | None
     sentiment: str | None
     sentiment_confidence: float | None
-    
+    clickbait_score: float | None
+    objectivity_score: float | None
+    objectivity_details: dict[str, Any] | None
     summary: str | None
     sentiment_score: float | None
     topic: str | None

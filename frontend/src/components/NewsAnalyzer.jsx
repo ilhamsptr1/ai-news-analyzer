@@ -11,14 +11,8 @@ import LanguageCard from './LanguageCard';
 // ─── Error message helper ────────────────────────────────────────────────────
 
 function getErrorMessage(err) {
-  if (!err) return 'An unexpected error occurred.';
-  const { status, detail } = err;
-  if (status === 400) return `Invalid or blocked URL: ${detail}`;
-  if (status === 422) return 'Article content could not be extracted. The page may require JavaScript or be behind a paywall.';
-  if (status === 502) return 'Could not reach the article website. The server may be unavailable.';
-  if (status === 504) return 'Request timed out. The website took too long to respond.';
-  if (status === 500) return 'A server error occurred. Please try again later.';
-  return detail || 'Analysis failed. Please try again.';
+  if (!err) return 'Terjadi kesalahan tidak terduga.';
+  return err.detail || 'Analisis gagal. Silakan coba lagi.';
 }
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
@@ -30,9 +24,9 @@ function LoadingState() {
         <div /><div /><div /><div />
       </div>
       <div className="analyzer-loading-text">
-        <span className="analyzer-loading-title">Analyzing article…</span>
+        <span className="analyzer-loading-title">Menganalisis artikel…</span>
         <span className="analyzer-loading-sub">
-          Extracting content · Detecting language · Running AI models
+          Mengekstrak konten · Mendeteksi bahasa · Menjalankan model AI
         </span>
       </div>
       {/* Skeleton cards */}
@@ -58,12 +52,12 @@ function UnsupportedLanguageState({ data, onReset }) {
   return (
     <div className="analyzer-unsupported" role="alert" aria-live="assertive">
       <div className="analyzer-unsupported-icon" aria-hidden="true">🌐</div>
-      <h3 className="analyzer-unsupported-title">Language Not Supported</h3>
+      <h3 className="analyzer-unsupported-title">Bahasa Tidak Didukung</h3>
       <p className="analyzer-unsupported-message">
         {data.message || 'Bahasa artikel ini belum didukung.'}
       </p>
       <p className="analyzer-unsupported-hint">
-        AI News Analyzer currently supports <strong>Bahasa Indonesia</strong> and <strong>English</strong>.
+        AI News Analyzer saat ini mendukung <strong>Bahasa Indonesia</strong> dan <strong>Bahasa Inggris</strong>.
       </p>
 
       {/* Show detected language */}
@@ -76,9 +70,9 @@ function UnsupportedLanguageState({ data, onReset }) {
       <button
         className="analyzer-new-btn"
         onClick={onReset}
-        aria-label="Try another article"
+        aria-label="Coba URL lain"
       >
-        ← Try Another URL
+        ← Coba URL Lain
       </button>
     </div>
   );
@@ -91,11 +85,11 @@ function ErrorState({ error, onReset }) {
     <div className="extractor-error" role="alert" aria-live="assertive">
       <div className="extractor-error-icon" aria-hidden="true">⚠️</div>
       <div className="extractor-error-body">
-        <h3 className="extractor-error-title">Analysis Failed</h3>
+        <h3 className="extractor-error-title">Analisis Gagal</h3>
         <p className="extractor-error-message">{getErrorMessage(error)}</p>
       </div>
       <button className="extractor-retry-btn" onClick={onReset}>
-        Try Again
+        Coba Lagi
       </button>
     </div>
   );
@@ -142,20 +136,17 @@ export default function NewsAnalyzer() {
   }
 
   return (
-    <section className="extractor-section" aria-labelledby="analyzer-heading">
+    <section className="extractor-container" aria-labelledby="analyzer-heading">
+      <div className="extractor-card">
       {/* Header */}
       <div className="extractor-header">
-        <div className="extractor-eyebrow">
-          <span className="extractor-eyebrow-dot" aria-hidden="true" />
-          Phase 5C — Full AI Analysis Pipeline
-        </div>
         <h2 id="analyzer-heading" className="extractor-title">
-          Understand Every Story
+          Analisis Artikel
         </h2>
         <p className="extractor-subtitle">
-          Paste a public news article URL. AI News Analyzer will extract the article,
-          detect the language, classify its category, analyze sentiment, extract
-          keywords, and identify named entities — all automatically.
+          Masukkan URL artikel berita publik. Sistem akan mengekstrak konten artikel
+          dan menjalankan deteksi bahasa, klasifikasi kategori, analisis sentimen,
+          ekstraksi kata kunci, dan pengenalan entitas bernama secara otomatis.
         </p>
       </div>
 
@@ -163,12 +154,12 @@ export default function NewsAnalyzer() {
       <form
         className="extractor-form"
         onSubmit={handleAnalyze}
-        aria-label="Article analysis form"
+        aria-label="Form analisis artikel"
         noValidate
       >
         <div className="extractor-input-group">
           <label htmlFor="analyzer-url-input" className="extractor-label">
-            Article URL
+            URL Artikel
           </label>
           <div className="extractor-input-row">
             <input
@@ -194,15 +185,15 @@ export default function NewsAnalyzer() {
               {status === 'loading' ? (
                 <>
                   <span className="extractor-spinner" aria-hidden="true" />
-                  Analyzing…
+                  Menganalisis…
                 </>
               ) : (
-                '🤖 Analyze Article'
+                'Analisis Artikel'
               )}
             </button>
           </div>
           <p id="analyzer-hint" className="extractor-hint">
-            Only public URLs are supported. Indonesian and English articles are fully supported.
+            Hanya URL publik yang didukung. Artikel berbahasa Indonesia dan Inggris didukung sepenuhnya.
           </p>
         </div>
       </form>
@@ -224,12 +215,13 @@ export default function NewsAnalyzer() {
           <button
             className="analyzer-new-btn"
             onClick={handleReset}
-            aria-label="Analyze another article"
+            aria-label="Analisis artikel lain"
           >
-            ＋ Analyze Another Article
+            ← Analisis Artikel Lain
           </button>
         </>
       )}
+      </div>
     </section>
   );
 }

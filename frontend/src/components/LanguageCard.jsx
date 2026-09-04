@@ -2,6 +2,8 @@
  * LanguageCard.jsx — Displays detected language with flag & confidence.
  */
 
+import { getConfidenceLabel } from '../utils/formatters';
+
 const LANG_FLAGS = {
   id: '🇮🇩',
   en: '🇬🇧',
@@ -17,10 +19,12 @@ const LANG_FLAGS = {
 
 export default function LanguageCard({ language }) {
   const flag = LANG_FLAGS[language.code] || '🌐';
+  const confidenceScore = language.confidence || 0;
   const confidencePct =
     language.confidence != null
-      ? `${(language.confidence * 100).toFixed(1)}%`
+      ? `${Math.round(confidenceScore * 100)}%`
       : null;
+  const confidenceLabel = language.confidence != null ? getConfidenceLabel(confidenceScore) : null;
 
   return (
     <div className="analysis-card" aria-label="Language detection result">
@@ -39,7 +43,9 @@ export default function LanguageCard({ language }) {
           <span className="lang-code">{language.code.toUpperCase()}</span>
         </div>
         {confidencePct && (
-          <span className="lang-confidence">{confidencePct}</span>
+          <span className="lang-confidence">
+            {confidencePct} <span className="lang-confidence-label" style={{fontSize: '0.85em', opacity: 0.8}}>({confidenceLabel})</span>
+          </span>
         )}
       </div>
 

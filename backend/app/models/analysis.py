@@ -38,6 +38,10 @@ class Analysis(Base):
     sentiment: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     
+    clickbait_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    objectivity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    objectivity_details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    
     # Keeping old fields for backwards compatibility
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -8,6 +8,9 @@ import CategoryCard from './CategoryCard';
 import SentimentCard from './SentimentCard';
 import KeywordList from './KeywordList';
 import EntityList from './EntityList';
+import ClickbaitCard from './ClickbaitCard';
+import ObjectivityCard from './ObjectivityCard';
+import PodcastPlayer from './PodcastPlayer';
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -33,9 +36,9 @@ function ArticleSummary({ article }) {
     <div className="analysis-article-card" role="article">
       {/* Source row */}
       <div className="article-result-source-row">
-        <span className="article-source-badge">🌐 {article.source || 'Unknown'}</span>
+        <span className="article-source-badge">{article.source || 'Unknown source'}</span>
         {article.author && (
-          <span className="article-author-badge">✍️ {article.author}</span>
+          <span className="article-author-badge">{article.author}</span>
         )}
         <span className="article-source-badge" style={{ marginLeft: 'auto' }}>
           ID #{article.id}
@@ -48,29 +51,20 @@ function ArticleSummary({ article }) {
       <div className="article-meta-grid">
         {formatDate(article.published_at) && (
           <div className="meta-chip">
-            <span className="meta-chip-icon">📅</span>
-            <div>
-              <div className="meta-chip-label">Published</div>
-              <div className="meta-chip-value">{formatDate(article.published_at)}</div>
-            </div>
+            <div className="meta-chip-label">Diterbitkan</div>
+            <div className="meta-chip-value">{formatDate(article.published_at)}</div>
           </div>
         )}
         {article.word_count != null && (
           <div className="meta-chip">
-            <span className="meta-chip-icon">📝</span>
-            <div>
-              <div className="meta-chip-label">Words</div>
-              <div className="meta-chip-value">{article.word_count.toLocaleString()}</div>
-            </div>
+            <div className="meta-chip-label">Kata</div>
+            <div className="meta-chip-value">{article.word_count.toLocaleString()}</div>
           </div>
         )}
         {article.reading_time != null && (
           <div className="meta-chip">
-            <span className="meta-chip-icon">⏱️</span>
-            <div>
-              <div className="meta-chip-label">Read time</div>
-              <div className="meta-chip-value">{article.reading_time} min</div>
-            </div>
+            <div className="meta-chip-label">Waktu baca</div>
+            <div className="meta-chip-value">{article.reading_time} mnt</div>
           </div>
         )}
       </div>
@@ -80,15 +74,15 @@ function ArticleSummary({ article }) {
         target="_blank"
         rel="noopener noreferrer"
         className="article-source-link"
-        aria-label="Open original article in new tab"
+        aria-label="Buka artikel asli di tab baru"
       >
-        View original article ↗
+        Lihat artikel asli ↗
       </a>
 
       <div className="article-result-divider" />
 
       {/* Article content preview */}
-      <h3 className="article-content-label">Article Content</h3>
+      <h3 className="article-content-label">Konten Artikel</h3>
       <div className="article-content-text" aria-live="polite">
         {displayContent.split('\n').map((para, i) =>
           para.trim() ? <p key={i}>{para.trim()}</p> : null
@@ -100,7 +94,7 @@ function ArticleSummary({ article }) {
           onClick={() => setExpanded(v => !v)}
           aria-expanded={expanded}
         >
-          {expanded ? '▲ Show less' : '▼ Read full article'}
+          {expanded ? '▲ Tampilkan lebih sedikit' : '▼ Baca artikel lengkap'}
         </button>
       )}
     </div>
@@ -131,24 +125,47 @@ export default function AnalysisResult({ data }) {
 
   return (
     <div className="analysis-result-wrapper">
-      {/* Saved badge */}
-      <div className="analysis-saved-banner" role="status" aria-live="polite">
-        <span aria-hidden="true">✅</span>
-        Article and analysis saved to database &mdash; ID #{analysis.id}
+      {/* Header controls: Saved badge + Print button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div className="analysis-saved-banner" style={{ margin: 0 }} role="status" aria-live="polite">
+          <span aria-hidden="true">✅</span>
+          Artikel dan analisis disimpan ke database &mdash; ID #{analysis.id}
+        </div>
+        
+        <button 
+          onClick={() => window.print()} 
+          className="btn-secondary hide-on-print" 
+          style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', padding: '8px 16px', background: '#fff', border: '1px solid var(--border-color)', color: 'var(--ink)' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Unduh Laporan (PDF)
+        </button>
       </div>
 
       {/* Article Summary */}
       <ArticleSummary article={article} />
 
+      <PodcastPlayer article={article} analysis={analysis} />
+
       {/* AI Analysis section heading */}
       <div className="analysis-section-heading">
-        <span aria-hidden="true">🤖</span> AI Analysis Results
+        Hasil Analisis AI
       </div>
 
       {/* 2-column top row: Language + Category */}
       <div className="analysis-cards-grid analysis-cards-grid--2">
         <LanguageCard language={language} />
         <CategoryCard category={category} />
+      </div>
+
+      {/* 2-column middle row: Clickbait + Objectivity */}
+      <div className="analysis-cards-grid analysis-cards-grid--2">
+        <ClickbaitCard score={analysis.clickbait_score || analysis?.clickbait?.score || 0} reasons={analysis?.clickbait?.reasons || []} />
+        <ObjectivityCard score={analysis.objectivity_score ?? analysis?.objectivity?.score ?? 0.5} details={analysis.objectivity_details || analysis?.objectivity?.details || {}} />
       </div>
 
       {/* Sentiment full-width */}

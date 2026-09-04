@@ -6,6 +6,10 @@ Uses pydantic-settings to load from environment variables / .env file.
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+from pathlib import Path
+
+env_path = Path(__file__).parent.parent / ".env"
+
 class Settings(BaseSettings):
     # Application
     app_name: str = "AI News Analyzer"
@@ -23,7 +27,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/ai_news_analyzer"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=env_path,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

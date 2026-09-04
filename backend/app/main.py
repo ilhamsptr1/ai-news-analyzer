@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routes import articles, health, keywords, entities, language, analyze, analyses
+from app.routes import articles, health, keywords, entities, language, analyze, analyses, dashboard
 
 # ---------------------------------------------------------------------------
 # Application instance
@@ -23,9 +23,13 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+from app.middleware import SimpleRateLimitMiddleware
+
 # ---------------------------------------------------------------------------
-# Middleware — CORS
+# Middleware
 # ---------------------------------------------------------------------------
+
+app.add_middleware(SimpleRateLimitMiddleware, max_requests=100, window_seconds=60)
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +50,7 @@ app.include_router(entities.router, prefix="/api/entities", tags=["Entities"])
 app.include_router(language.router, prefix="/api/language", tags=["Language"])
 app.include_router(analyses.router, prefix="/api/analyses", tags=["Analysis History"])
 app.include_router(analyze.router, prefix="/api", tags=["Analysis"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 
 # ---------------------------------------------------------------------------
 # Root redirect hint

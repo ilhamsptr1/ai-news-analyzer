@@ -15,6 +15,7 @@ from app.schemas.analyze import (
     AnalyzeRequest,
     AnalyzeResponse,
     CategoryResult,
+    ClickbaitResult,
     EntitiesInfo,
     KeywordResult,
     KeywordsInfo,
@@ -135,4 +136,8 @@ def analyze(request: AnalyzeRequest):
             ],
             model=ent_data.get("model", ""),
         ),
+        clickbait=ClickbaitResult(
+            score=result.get("clickbait", {}).get("score", 0.0),
+            reasons=result.get("clickbait", {}).get("reasons", [])
+        )
     )

@@ -318,7 +318,7 @@ def analyze_article_pipeline_endpoint(
         
     # Step 4 - ML Analysis Pipeline
     analyzer = get_multilingual_analyzer()
-    analysis_result = analyzer.analyze(text=article.content, top_keywords=payload.top_keywords)
+    analysis_result = analyzer.analyze(text=article.content, title=article.title, top_keywords=payload.top_keywords)
     
     # Step 5 - Check if Unsupported
     if not analysis_result["supported"]:
@@ -358,10 +358,14 @@ def analyze_article_pipeline_endpoint(
         category_confidence=analysis_result["category"]["confidence"],
         sentiment=analysis_result["sentiment"]["sentiment"],
         sentiment_confidence=analysis_result["sentiment"]["confidence"],
+        clickbait_score=analysis_result.get("clickbait", {}).get("score", 0.0),
+        objectivity_score=analysis_result.get("objectivity", {}).get("score", 0.5),
+        objectivity_details=analysis_result.get("objectivity", {}).get("details", {}),
         word_count=article.word_count,
         reading_time=article.reading_time,
         model_versions={
-            "ner": analysis_result["entities"]["model"]
+            "ner": analysis_result["entities"]["model"],
+            "sentiment": analysis_result["sentiment"].get("model", "Unknown")
         },
         keywords=keywords_payload,
         entities=entities_payload

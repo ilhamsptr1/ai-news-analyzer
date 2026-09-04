@@ -1,75 +1,68 @@
 # AI News Analyzer
 
-An AI-powered news intelligence platform for analyzing news articles using NLP, sentiment analysis, named entity recognition, keyword extraction, and automated summarization.
+An AI-powered news intelligence platform for analyzing public news articles using NLP. It extracts article content, detects language, classifies news categories, analyzes sentiment, extracts keywords, and performs Named Entity Recognition (NER).
 
 ---
 
-## Current Phase
+## 🚀 Features
 
-**Phase 2 — PostgreSQL Database & Data Architecture**
-
-Full database layer is in place: PostgreSQL, SQLAlchemy ORM, Alembic migrations, service layer, and article CRUD API.
-
----
-
-## Technology
-
-### Backend
-| Tool | Version | Purpose |
-|---|---|---|
-| **Python** | 3.12 | Runtime |
-| **FastAPI** | 0.115 | Web framework |
-| **Uvicorn** | 0.32 | ASGI server |
-| **Pydantic / Pydantic-Settings** | 2.x | Data validation & config |
-| **SQLAlchemy** | 2.0 | ORM |
-| **psycopg** | 3.3 | PostgreSQL driver |
-| **Alembic** | 1.19 | Database migrations |
-| **pytest + httpx** | — | Testing |
-
-### Frontend
-| Tool | Purpose |
-|---|---|
-| **React 18** | UI library |
-| **Vite 8** | Build tool & dev server |
-| **Tailwind CSS v4** | Utility-first styling |
-
-### Database
-| Tool | Purpose |
-|---|---|
-| **PostgreSQL 18** | Primary database |
+- **Article Extraction**: Automatically fetches and extracts clean text from public news URLs (handling Cloudflare, paywalls, and basic bot protections gracefully).
+- **Multilingual Support**: Fully supports **Bahasa Indonesia** and **English**. Unsupported languages are automatically rejected.
+- **AI Pipeline**:
+  - Language Detection (FastText-based heuristic)
+  - Category Classification (Zero-shot / SVM)
+  - Sentiment Analysis (IndoBERT / DistilBERT)
+  - Keyword Extraction (YAKE / TF-IDF fallback)
+  - Named Entity Recognition (SpaCy / IndoLEM)
+- **Analytics Dashboard**: Real-time aggregation of processed articles, sentiments, languages, and trends.
+- **Production Hardened**: Includes rate limiting, SSRF protection, optimized PostgreSQL database pooling, and comprehensive error handling.
 
 ---
 
-## Requirements
+## 🏗️ Architecture & Tech Stack
 
+The application uses a modern decoupled architecture:
+
+### Backend (Python)
+- **FastAPI**: High-performance async web framework.
+- **SQLAlchemy & PostgreSQL**: Robust relational data modeling.
+- **Scikit-Learn, SpaCy, HuggingFace**: Machine Learning stack.
+- **Trafilatura & BeautifulSoup**: Web scraping and text extraction.
+
+### Frontend (JavaScript/React)
+- **React 18 & Vite**: Fast UI rendering and build tooling.
+- **Vanilla CSS**: Custom design system without heavy framework dependencies.
+- **Native SVG Charts**: Lightweight custom visualizations.
+
+---
+
+## 🛠️ Installation & Setup
+
+### 1. Requirements
 - Python 3.10+
 - Node.js 18+
-- npm 9+
-- Git
 - PostgreSQL 14+
 
----
+### 2. Database Setup (PostgreSQL)
+Create the database in your PostgreSQL instance:
+```sql
+CREATE DATABASE ai_news_analyzer;
+```
 
-## Backend Setup
-
+### 3. Backend Setup
 ```bash
 cd backend
-
-# Create virtual environment
 python -m venv venv
 
-# Activate (Windows)
-.\venv\Scripts\activate
-
-# Activate (macOS / Linux)
-source venv/bin/activate
+# Activate virtual environment
+.\venv\Scripts\activate      # Windows
+source venv/bin/activate     # macOS / Linux
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy and configure environment file
-copy .env.example .env    # Windows
-cp .env.example .env      # macOS / Linux
+# Configure environment variables
+cp .env.example .env
 # Edit .env and set DATABASE_URL with your PostgreSQL credentials
 
 # Run database migrations
@@ -78,198 +71,27 @@ alembic upgrade head
 # Run development server
 uvicorn app.main:app --reload
 ```
+The backend API will run at: `http://localhost:8000`
 
-Backend will be available at: `http://localhost:8000`
-
----
-
-## Database Setup
-
-### 1. Install PostgreSQL
-
-Download from https://www.postgresql.org/download/
-
-### 2. Create database
-
-```bash
-psql -U postgres
-CREATE DATABASE ai_news_analyzer;
-\q
-```
-
-### 3. Configure environment
-
-Edit `backend/.env`:
-
-```env
-DATABASE_URL=postgresql+psycopg://postgres:your_password@localhost:5432/ai_news_analyzer
-```
-
-### 4. Run migrations
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-### 5. Verify tables
-
-```bash
-psql -U postgres -d ai_news_analyzer -c "\dt"
-```
-
-Expected output:
-```
- public | alembic_version | table | postgres
- public | analyses        | table | postgres
- public | articles        | table | postgres
- public | entities        | table | postgres
- public | keywords        | table | postgres
-```
-
----
-
-## Frontend Setup
-
+### 4. Frontend Setup
 ```bash
 cd frontend
 npm install
-copy .env.example .env    # Windows
+
+# Configure environment variables
+cp .env.example .env
+# Ensure VITE_API_URL=http://localhost:8000 is set
+
+# Start development server
 npm run dev
 ```
-
-Frontend will be available at: `http://localhost:5173`
-
----
-
-## Database Schema
-
-```
-ARTICLE
-  id, title, url*, source*, content, published_at*, created_at, updated_at
-    │
-    │ 1:N  (CASCADE DELETE)
-    ▼
-ANALYSIS
-  id, article_id→, summary*, sentiment*, sentiment_score*, category*,
-  topic*, word_count*, character_count*, reading_time*, created_at
-    │
-    ├──── 1:N (CASCADE DELETE)
-    │     ▼
-    │   KEYWORD
-    │     id, analysis_id→, keyword, score*
-    │
-    └──── 1:N (CASCADE DELETE)
-          ▼
-        ENTITY
-          id, analysis_id→, entity, entity_type*, score*
-
-  * nullable
-```
+The frontend UI will run at: `http://localhost:5173`
 
 ---
 
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Health check |
-| `GET` | `/api/docs` | Swagger UI |
-| `GET` | `/api/redoc` | ReDoc documentation |
-| `POST` | `/api/articles` | Create a new article |
-| `GET` | `/api/articles` | List articles (paginated) |
-| `GET` | `/api/articles/{id}` | Get article by ID |
-| `DELETE` | `/api/articles/{id}` | Delete article |
-
-### Create Article Request
-
-```json
-{
-  "title": "Example News Article",
-  "url": "https://example.com/news",
-  "source": "Example News",
-  "content": "Full article text content goes here."
-}
-```
-
-### Create Article Response
-
-```json
-{
-  "id": 1,
-  "title": "Example News Article",
-  "url": "https://example.com/news",
-  "source": "Example News",
-  "content": "Full article text content goes here.",
-  "published_at": null,
-  "created_at": "2026-08-14T13:00:00+07:00",
-  "updated_at": "2026-08-14T13:00:00+07:00"
-}
-```
-
----
-
-## Running Tests
-
-```bash
-cd backend
-.\venv\Scripts\activate    # Windows
-pytest -v
-```
-
----
-
-## Project Structure
-
-```
-ai-news-analyzer/
-├── backend/
-│   ├── alembic/
-│   │   ├── versions/          # Migration files
-│   │   └── env.py             # Alembic configuration
-│   ├── alembic.ini
-│   ├── app/
-│   │   ├── main.py            # FastAPI application
-│   │   ├── config.py          # Pydantic-settings configuration
-│   │   ├── database.py        # SQLAlchemy engine & session
-│   │   ├── routes/
-│   │   │   ├── health.py      # Health check router
-│   │   │   └── articles.py    # Articles CRUD router
-│   │   ├── models/
-│   │   │   ├── article.py     # Article ORM model
-│   │   │   ├── analysis.py    # Analysis ORM model
-│   │   │   ├── keyword.py     # Keyword ORM model
-│   │   │   └── entity.py      # Entity ORM model
-│   │   ├── schemas/
-│   │   │   ├── article.py     # Article Pydantic schemas
-│   │   │   ├── analysis.py    # Analysis Pydantic schemas
-│   │   │   ├── keyword.py     # Keyword Pydantic schemas
-│   │   │   └── entity.py      # Entity Pydantic schemas
-│   │   ├── services/
-│   │   │   ├── article_service.py
-│   │   │   └── analysis_service.py
-│   │   ├── ai/                # NLP / AI modules (Phase 3+)
-│   │   └── utils/
-│   ├── tests/
-│   │   ├── test_health.py     # Phase 1 health tests
-│   │   └── test_database.py   # Phase 2 database tests
-│   ├── requirements.txt
-│   └── .env.example
-│
-├── frontend/
-│   └── ...                    # React + Vite + Tailwind
-│
-├── docker-compose.yml         # Phase 3+
-├── .gitignore
-└── README.md
-```
-
----
-
-## Environment Variables
+## ⚙️ Environment Variables
 
 ### Backend (`backend/.env`)
-
 ```env
 APP_NAME=AI News Analyzer
 APP_ENV=development
@@ -277,27 +99,61 @@ APP_VERSION=1.0.0
 BACKEND_HOST=127.0.0.1
 BACKEND_PORT=8000
 FRONTEND_URL=http://localhost:5173
-
 DATABASE_URL=postgresql+psycopg://USERNAME:PASSWORD@localhost:5432/ai_news_analyzer
 ```
 
 ### Frontend (`frontend/.env`)
-
 ```env
 VITE_API_URL=http://localhost:8000
 ```
 
 ---
 
-## Future Development
+## 🧪 Running Tests
 
-| Phase | Features |
-|---|---|
-| **Phase 3** | AI/NLP pipeline, sentiment analysis, text classification |
-| **Phase 4** | Named entity recognition, keyword extraction, news tagging |
-| **Phase 5** | News API integration, article scraping, automated summarization |
-| **Phase 6** | Analytics dashboard, visualizations, reporting |
+The backend includes a comprehensive test suite (180+ tests) covering all phases from health checks to AI model validation.
+```bash
+cd backend
+.\venv\Scripts\activate
+pytest -v
+```
 
 ---
 
-*AI News Analyzer — Phase 2 complete.*
+## 📚 API Documentation
+
+Once the backend is running, you can access the interactive API documentation at:
+- **Swagger UI**: `http://localhost:8000/api/docs`
+- **ReDoc**: `http://localhost:8000/api/redoc`
+
+**Core Endpoints**:
+- `POST /api/articles/extract`: Extract and save an article.
+- `POST /api/articles/analyze`: Run the full AI pipeline on an article.
+- `GET /api/analyses`: Retrieve paginated history of analyses.
+- `GET /api/dashboard/stats`: Retrieve aggregation statistics.
+
+---
+
+## 🧠 ML Models & Supported Languages
+
+| Language | Category Classifier | Sentiment Classifier | NER Model |
+|----------|---------------------|----------------------|-----------|
+| **English** | `valhalla/distilbart-mnli-12-1` | `distilbert-base-uncased-finetuned-sst-2-english` | `en_core_web_sm` (SpaCy) |
+| **Indonesian** | SVM + TF-IDF (Custom) | `indobenchmark/indobert-base-p1` | `indolem/indobert-base-uncased` |
+
+---
+
+## ⚠️ Known Limitations & Deployment Notes
+
+1. **Scraping Limitations**: 
+   - The extraction engine respects HTTP `403` and `429`. It will **not** attempt to bypass CAPTCHAs, Cloudflare bot protection, or hard paywalls.
+   - Websites requiring heavy JavaScript rendering to load main text may return empty content.
+2. **Machine Learning Memory**: 
+   - The HuggingFace Transformers models (especially IndoBERT) require significant RAM. A minimum of 4GB RAM is recommended for the backend server.
+3. **Deployment**:
+   - For production deployment, ensure `.env` files are excluded from version control.
+   - A reverse proxy (e.g., Nginx) is recommended to serve the compiled frontend (`npm run build`) and proxy API requests to Gunicorn/Uvicorn.
+   - Use a robust rate limiter (e.g., Redis-based) instead of the in-memory middleware for multi-worker production setups.
+
+---
+*Project completed up to Phase 7 — Production Hardening.*

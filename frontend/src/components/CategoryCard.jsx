@@ -2,6 +2,8 @@
  * CategoryCard.jsx — News category with confidence bar.
  */
 
+import { getConfidenceLabel } from '../utils/formatters';
+
 const CATEGORY_ICONS = {
   Technology: '💻',
   Politics: '🏛️',
@@ -20,7 +22,9 @@ const CATEGORY_ICONS = {
 
 export default function CategoryCard({ category }) {
   const icon = CATEGORY_ICONS[category.category] || '📰';
-  const confidencePct = Math.round((category.confidence || 0) * 100);
+  const confidenceScore = category.confidence || 0;
+  const confidencePct = Math.round(confidenceScore * 100);
+  const confidenceLabel = getConfidenceLabel(confidenceScore);
 
   return (
     <div className="analysis-card" aria-label="News category">
@@ -36,7 +40,9 @@ export default function CategoryCard({ category }) {
 
       <div className="confidence-row">
         <span className="confidence-label">Confidence</span>
-        <span className="confidence-value">{confidencePct}%</span>
+        <span className="confidence-value">
+          {confidencePct}% <span className="confidence-text-label">({confidenceLabel})</span>
+        </span>
       </div>
       <div
         className="confidence-bar"

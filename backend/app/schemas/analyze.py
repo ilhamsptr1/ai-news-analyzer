@@ -57,7 +57,16 @@ class SentimentResult(BaseModel):
     sentiment: str
     confidence: float
     all_scores: dict[str, float]
+    model: str | None = None
 
+
+class ClickbaitResult(BaseModel):
+    score: float = Field(..., description="Clickbait score (0 to 1)")
+    reasons: list[str] = Field(default_factory=list, description="Reasons for the score")
+
+class ObjectivityResult(BaseModel):
+    score: float = Field(..., description="Objectivity score (0 to 1)")
+    details: dict = Field(default_factory=dict, description="Objectivity details")
 
 class KeywordResult(BaseModel):
     keyword: str
@@ -87,6 +96,8 @@ class AnalyzeResponse(BaseModel):
     sentiment: SentimentResult
     keywords: KeywordsInfo
     entities: EntitiesInfo
+    clickbait: ClickbaitResult | None = None
+    objectivity: ObjectivityResult | None = None
 
 from app.schemas.article import ArticleResponse
 from app.schemas.analysis import AnalysisResponse

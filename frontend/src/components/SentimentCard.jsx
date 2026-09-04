@@ -2,6 +2,8 @@
  * SentimentCard.jsx — Sentiment with visual indicator.
  */
 
+import { getConfidenceLabel } from '../utils/formatters';
+
 const SENTIMENT_CONFIG = {
   Positive: { icon: '😊', color: 'green', label: 'Positive' },
   Neutral:  { icon: '😐', color: 'gray',  label: 'Neutral'  },
@@ -14,7 +16,9 @@ const SENTIMENT_CONFIG = {
 export default function SentimentCard({ sentiment }) {
   const raw = sentiment.sentiment || 'Neutral';
   const config = SENTIMENT_CONFIG[raw] || { icon: '😐', color: 'gray', label: raw };
-  const confidencePct = Math.round((sentiment.confidence || 0) * 100);
+  const confidenceScore = sentiment.confidence || 0;
+  const confidencePct = Math.round(confidenceScore * 100);
+  const confidenceLabel = getConfidenceLabel(confidenceScore);
 
   return (
     <div className="analysis-card" aria-label="Sentiment analysis result">
@@ -30,7 +34,9 @@ export default function SentimentCard({ sentiment }) {
 
       <div className="confidence-row">
         <span className="confidence-label">Confidence</span>
-        <span className="confidence-value">{confidencePct}%</span>
+        <span className="confidence-value">
+          {confidencePct}% <span className="confidence-text-label">({confidenceLabel})</span>
+        </span>
       </div>
       <div
         className="confidence-bar"

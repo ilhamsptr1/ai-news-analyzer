@@ -57,9 +57,9 @@ class TestNERExtractorCore:
         assert len(ents) > 0
         
         labels = [e["label"] for e in ents]
-        # Should detect PER (Prabowo, Elon Musk), GPE/LOC (Jakarta)
-        assert "PER" in labels
-        assert "GPE" in labels or "LOC" in labels
+        # Should detect PER (Prabowo, Elon Musk), GPE/LOC (Jakarta) mapped to PERSON, LOCATION
+        assert "PERSON" in labels
+        assert "LOCATION" in labels
         
         # Verify span exactly matches text
         for ent in ents:
@@ -75,10 +75,10 @@ class TestNERExtractorCore:
         assert len(ents) > 0
         
         labels = [e["label"] for e in ents]
-        # Tim Cook -> PERSON, Apple -> ORG, California -> GPE
+        # Tim Cook -> PERSON, Apple -> ORGANIZATION, California -> LOCATION
         assert "PERSON" in labels
-        assert "ORG" in labels
-        assert "GPE" in labels
+        assert "ORGANIZATION" in labels
+        assert "LOCATION" in labels
         
         for ent in ents:
             assert TEXT_EN_SHORT[ent["start"]:ent["end"]] == ent["text"]
@@ -108,11 +108,11 @@ class TestNERExtractorCore:
         assert "PERSON" in groups
         assert "Tim Cook" in groups["PERSON"]
         
-        assert "ORG" in groups
-        assert "Apple" in groups["ORG"]
+        assert "ORGANIZATION" in groups
+        assert "Apple" in groups["ORGANIZATION"]
         
-        assert "GPE" in groups
-        assert "California" in groups["GPE"]
+        assert "LOCATION" in groups
+        assert "California" in groups["LOCATION"]
 
     def test_performance_indonesian(self, extractor):
         # We ensure it runs within 3 seconds for a short text
@@ -127,6 +127,33 @@ class TestNERExtractorCore:
         extractor.extract(TEXT_EN_SHORT, language="en")
         elapsed = time.time() - start
         assert elapsed < 1.0
+
+    def test_noise_filtering(self, extractor):
+        # Should filter out currencies, percentages, and pure numbers/years
+        text = "Tahun 2026, anggaran sebesar Rp4.097,2 triliun dan bunga 6,62 persen untuk Rp 400."
+        res = extractor.extract(text, language="id")
+        ents = res["entities"]
+        texts = [e["text"].lower() for e in ents]
+        
+        # Verify those bad strings are NOT extracted
+        assert "2026" not in texts
+        assert "rp4.097,2" not in texts
+        assert "rp4.097,2 triliun" not in texts
+        assert "6,62 persen" not in texts
+        assert "rp 400" not in texts
+
+    def test_label_mapping(self, extractor):
+        text = "Tim Cook works at Apple in California."
+        res = extractor.extract(text, language="en")
+        ents = res["entities"]
+        labels = [e["label"] for e in ents]
+        # Check mapping logic
+        assert "PERSON" in labels
+        assert "ORGANIZATION" in labels
+        assert "LOCATION" in labels
+        # Verify no raw labels like ORG or GPE
+        assert "ORG" not in labels
+        assert "GPE" not in labels
 
 
 # ===========================================================================

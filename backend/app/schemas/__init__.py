@@ -7,7 +7,7 @@ from app.schemas.article import (
     ArticleResponse,
     ArticleUpdate,
 )
-from app.schemas.entity import EntityCreate, EntityResponse
+from app.schemas.entity import EntityExtractRequest, EntityExtractResponse, EntityItem
 from app.schemas.keyword import KeywordCreate, KeywordResponse
 
 __all__ = [
@@ -19,6 +19,7 @@ __all__ = [
     "AnalysisResponse",
     "KeywordCreate",
     "KeywordResponse",
-    "EntityCreate",
-    "EntityResponse",
+    "EntityExtractRequest",
+    "EntityExtractResponse",
+    "EntityItem",
 ]

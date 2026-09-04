@@ -96,16 +96,22 @@ def _is_valid_keyword(kw: str, language: str = "en") -> bool:
         return False
     if _PUNCT_ONLY.match(kw):
         return False
-    if _DIGITS_ONLY.match(kw):
+    
+    # Filter pure numbers, even with dots/commas
+    kw_numeric = kw.replace(".", "").replace(",", "").replace("%", "").strip()
+    if kw_numeric.isdigit() or _DIGITS_ONLY.match(kw_numeric):
         return False
     
     # All tokens are stopwords?
     tokens = kw.lower().split()
     stopword_set = _STOPWORD_ID if language == "id" else _STOPWORD_EN
     
-    # Exclude negation words from being treated as pure stopword keywords
-    # if they somehow end up alone, but usually they are filtered if all tokens are stopwords.
     if all(t in stopword_set for t in tokens):
+        return False
+    
+    # Bad chunks: starts or ends with certain bad stopwords
+    bad_edges = {"dan", "yang", "pada", "dari", "untuk", "dengan", "adalah", "atau", "di", "ke", "dalam", "ini", "itu"}
+    if tokens[0] in bad_edges or tokens[-1] in bad_edges:
         return False
         
     return True

@@ -99,6 +99,7 @@ class IndonesianSentimentClassifier:
             "sentiment": predicted,
             "confidence": confidence,
             "all_scores": scores,
+            "model": self._metadata.get("model_name", "Unknown"),
         }
 
     def predict_batch(self, texts: list[str]) -> list[dict]:
@@ -117,6 +118,7 @@ class IndonesianSentimentClassifier:
                 "sentiment": str(classes[best_idx]),
                 "confidence": round(float(proba[best_idx]), 4),
                 "all_scores": scores,
+                "model": self._metadata.get("model_name", "Unknown"),
             })
         return results
 
