@@ -24,4 +24,4 @@ COPY . .
 
 # Run alembic migrations and then start the uvicorn server
 # Use a script or chained command
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 10000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 7860"]
